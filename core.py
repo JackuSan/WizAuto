@@ -13,6 +13,7 @@ import sys
 from datetime import datetime
 import tkinter as tk
 from tkinter import messagebox
+import platform
 
 import constants
 import state
@@ -20,69 +21,87 @@ import state
 logger = logging.getLogger(__name__)
 
 # 系統函數
-def is_player_running():    #檢查bs/mumu是否運行
-    """檢查 BlueStacks/Mumuplayer 是否正在運行"""
+def is_player_running():    #檢查mumu是否運行
+    """檢查 Mumuplayer 是否正在運行"""
     # (state) global state.game_player
     for i in range(3):
         for proc in psutil.process_iter(['name']):
-            if proc.info['name'].lower() in ['hd-player.exe', 'bluestacks.exe']:
-                logger.info("Bluestack正在運行")
-                state.game_player = "bluestack"
-                return True
-            elif proc.info['name'].lower() in ['mumunxdevice.exe']:
+            name = proc.info['name'].lower()
+            if name in ['mumunxdevice.exe', 'mumunxdevice', 'mumunydevice', 'mumuplayer']:
                 logger.info("Mumuplayer正在運行")
                 state.game_player = "mumuplayer"
                 return True
     logger.info("沒有找到模擬器")
     return False
-def start_game_player(): #重啟bs
-    """啟動 BlueStacks 的快捷方式 (wiz.lnk)"""
-    # (state) global state.game_player
+def start_game_player():
+    """啟動 MuMu 的快捷方式 (wiz.lnk / wiz.command)"""
+    now = time.time()
+    if now - state.last_player_restart_time < 60:
+        logger.warning(f"距離上次重啟模擬器不足 60 秒，跳過本次 start_game_player")
+        return False
+
+    state.last_player_restart_time = now
+
     if getattr(sys, 'frozen', False):
-        script_dir = os.path.dirname(sys.executable)    #打包成 exe 時，用 exe 所在目錄
+        script_dir = os.path.dirname(sys.executable)
     else:
-        script_dir = os.path.dirname(os.path.abspath(__file__)) #直接跑 .py 時，用腳本目錄
-    wiz_path = os.path.join(script_dir, 'wiz.lnk')
-    
-    if state.game_player == "bluestack":
-        subprocess.run(['taskkill', '/F', '/IM', 'HD-Player.exe'], check=False)
-    elif state.game_player == "mumuplayer":
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # 1. 先殺掉舊進程
+    if platform.system() == 'Windows':
         subprocess.run(['taskkill', '/F', '/IM', 'mumunxdevice.exe'], check=False)
-    
-    if os.path.exists(wiz_path):
-        try:
-            logger.info(f"正在啟動遊戲模擬器: {wiz_path}")
-            proc = subprocess.Popen([wiz_path], shell=True)
-            
-            # 步驟1: 等待 遊戲模擬器進程出現（最多 30 秒）
-            wait_process_start = time.time()
-            while time.time() - wait_process_start < 30:
-                if is_player_running(): 
-                    logger.info("遊戲模擬器進程已偵測到")
-                    break
-                time.sleep(2)
-            else:
-                raise Exception("遊戲模擬器進程啟動超時")
-            
-            # 步驟2: 重試重連 ADB（最多 60 秒）
-            connected = False
-            adb_count = 0
-            wait_connect_start = time.time()
-            while time.time() - wait_connect_start < 60:
-                adb_count += 1
-                logger.info(f"嘗試重連 ADB, 次數: {adb_count}")
-                if connect_to_device():  # 使用新版
-                    connected = True
-                    break
-                time.sleep(5)  # 重試間隔，避免太頻繁
-            if not connected:
-                raise Exception("ADB 重連超時，無法繼續")
-            logger.info("遊戲模擬器已啟動")
-            game_restart()
-        except Exception as e:
-            logger.error(f"啟動遊戲模擬器失敗: {e}")
+        wiz_path = os.path.join(script_dir, 'wiz.lnk')
     else:
+        # Mac 實際進程名請再確認
+        subprocess.run(['killall', '-9', 'MuMuNyxDevice'], check=False)
+        subprocess.run(['pkill', '-9', '-f', 'MuMu'], check=False)
+        wiz_path = os.path.join(script_dir, 'wiz.command')
+
+    if not os.path.exists(wiz_path):
         logger.error(f"快捷方式未找到: {wiz_path}")
+        return False
+
+    try:
+        logger.info(f"正在啟動遊戲模擬器: {wiz_path}")
+
+        # 2. 只啟動一次
+        if platform.system() == 'Windows':
+            subprocess.Popen([wiz_path], shell=True)
+        else:
+            subprocess.Popen(['open', wiz_path])
+
+        # 3. 等待進程出現
+        wait_process_start = time.time()
+        while time.time() - wait_process_start < 30:
+            if is_player_running():
+                logger.info("遊戲模擬器進程已偵測到")
+                break
+            time.sleep(2)
+        else:
+            raise Exception("遊戲模擬器進程啟動超時")
+
+        # 4. 重連 ADB
+        connected = False
+        adb_count = 0
+        wait_connect_start = time.time()
+        while time.time() - wait_connect_start < 60:
+            adb_count += 1
+            logger.info(f"嘗試重連 ADB, 次數: {adb_count}")
+            if connect_to_device():
+                connected = True
+                break
+            time.sleep(5)
+
+        if not connected:
+            raise Exception("ADB 重連超時，無法繼續")
+
+        logger.info("遊戲模擬器已啟動")
+        game_restart()
+        return True
+
+    except Exception as e:
+        logger.error(f"啟動遊戲模擬器失敗: {e}")
+        return False
 def check_requirements():   #檢查圖片包
     # (state) global state.image_dir
     # 動態設置圖像目錄路徑
@@ -100,25 +119,21 @@ def check_requirements():   #檢查圖片包
         adb_dir = os.path.join(os.path.dirname(sys.executable), 'platform-tools')
     else:
         adb_dir = os.path.join(os.path.dirname(__file__), 'platform-tools')
-    adb_path = os.path.join(adb_dir, 'adb.exe') if os.name == 'nt' else 'adb'
+    adb_path = get_adb_path()
     if not os.path.exists(adb_dir):
         logger.error(f"platform-tools 資料夾 {adb_dir} 不存在")
         messagebox.showerror("錯誤", f"platform-tools 資料夾 {adb_dir} 不存在，請確保 platform-tools 資料夾與腳本或 exe 同級")
         exit(1)
     if not os.path.exists(adb_path):
         logger.error(f"ADB 可執行文件 {adb_path} 不存在")
-        messagebox.showerror("錯誤", f"ADB 可執行文件 {adb_path} 不存在，請確保 platform-tools 資料夾中包含 adb.exe")
+        messagebox.showerror("錯誤", f"ADB 可執行文件 {adb_path} 不存在，請確保 platform-tools 資料夾中包含 adb程式")
         exit(1)
 def connect_to_device():    #連接adb
     """
     嘗試連接 ADB 並確認設備 online。
     返回 True 如果成功，False 否則。
     """
-    if getattr(sys, 'frozen', False):
-        adb_dir = os.path.join(os.path.dirname(sys.executable), 'platform-tools')
-    else:
-        adb_dir = os.path.join(os.path.dirname(__file__), 'platform-tools')
-    adb_path = os.path.join(adb_dir, 'adb.exe') if os.name == 'nt' else 'adb'
+    adb_path = get_adb_path()
     
     # 先執行 connect
     connect_cmd = f'"{adb_path}" connect {constants.ADB_HOST}:{state.adb_port}'
@@ -326,7 +341,7 @@ def check_gameicon(screenshot=None, similarity=0.8):
     game_restart()
     return True
 def check_backtotitle(screenshot=None, similarity=0.8):
-    """檢查是否閃退出bs頁面"""
+    """檢查是否閃退出模擬器頁面"""
     # (state) global state.paused
     if screenshot is None:
         take_screenshot()
@@ -387,17 +402,22 @@ def check_abnormality(sim=0.8):
         game_restart()
         return True
     return False
+def get_adb_path(): 
+    if hasattr(sys, 'frozen') and getattr(sys, 'frozen', False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    adb_dir = os.path.join(base, 'platform-tools')
+    
+    if platform.system() == 'Windows':
+        return os.path.join(adb_dir, 'windows', 'adb.exe')
+    else:  # macOS / Linux
+        return os.path.join(adb_dir, 'mac', 'adb')
 
 # ADB 工具函數
 def run_adb_command(command):   #執行adb指令
     """執行 ADB 命令並返回輸出，指定設備端口"""
-    if getattr(sys, 'frozen', False):
-        # 打包環境：platform-tools 與 exe 同級
-        adb_dir = os.path.join(os.path.dirname(sys.executable), 'platform-tools')
-    else:
-        # 開發環境：platform-tools 與腳本同級
-        adb_dir = os.path.join(os.path.dirname(__file__), 'platform-tools')
-    adb_path = os.path.join(adb_dir, 'adb.exe') if os.name == 'nt' else 'adb'
+    adb_path = get_adb_path()
     full_command = f'"{adb_path}" -s {constants.ADB_HOST}:{state.adb_port} {command}'
     for i in range(3):
         try:
@@ -409,13 +429,28 @@ def run_adb_command(command):   #執行adb指令
         except subprocess.CalledProcessError as e:
             logger.error(f"ADB 命令執行失敗: {e}")
             logger.error(f"命令輸出: {e.stderr.strip()}")
-            if state.game_player == "mumuplayer":
-               subprocess.run(['taskkill', '/F', '/IM', 'mumunxdevice.exe'], check=False)
-            logger.error("等待15秒觀察遊戲模擬器是否閃退")
-            time.sleep(15)
+            
+            # 先嘗試恢復 ADB，而不是直接殺模擬器
+            logger.warning("嘗試恢復 ADB 連線...")
+            adb_path = get_adb_path()
+            
+            subprocess.run(f'"{adb_path}" kill-server', shell=True)
+            time.sleep(1)
+            subprocess.run(f'"{adb_path}" start-server', shell=True)
+            time.sleep(2)
+            
+            if connect_to_device():
+                logger.info("ADB 已恢復，不重啟模擬器")
+                return None   # 讓上層決定要不要重試命令
+            
+            # 真的恢復失敗才檢查模擬器進程
+            logger.error("ADB 恢復失敗，等待10秒觀察模擬器是否閃退")
+            time.sleep(10)
             if not is_player_running():
-                logger.info("遊戲模擬器意外關閉，嘗試重啟")
+                logger.info("遊戲模擬器確實關閉，嘗試重啟")
                 start_game_player()
+            else:
+                logger.warning("模擬器進程仍在，但 ADB 無法連線，暫不重啟")
     else:
         return None
 def take_screenshot(name=None, region=None):    #截圖
@@ -423,12 +458,8 @@ def take_screenshot(name=None, region=None):    #截圖
     # 控頻：非存檔截圖時，強制小休 0.2 秒（每秒最多截圖 5 次，大幅減輕 CPU 負載）
     if name is None:
         time.sleep(0.2)
-        
-    if getattr(sys, 'frozen', False):
-        adb_dir = os.path.join(os.path.dirname(sys.executable), 'platform-tools')
-    else:
-        adb_dir = os.path.join(os.path.dirname(__file__), 'platform-tools')
-    adb_path = os.path.join(adb_dir, 'adb.exe') if os.name == 'nt' else 'adb'
+
+    adb_path = get_adb_path()
     
     # 定義 full_command，透過管道流直接讀取二進制數據 (-p 代表 png 格式)
     full_command = f'"{adb_path}" -s {constants.ADB_HOST}:{state.adb_port} shell screencap -p'
@@ -442,7 +473,11 @@ def take_screenshot(name=None, region=None):    #截圖
             return None
             
         # 將二進制數據轉換為 OpenCV 圖像
-        image_bytes = result.stdout.replace(b'\r\n', b'\n') if os.name == 'nt' else result.stdout
+        if platform.system() == 'Windows':
+            image_bytes = result.stdout.replace(b'\r\n', b'\n')
+        else:
+            image_bytes = result.stdout
+        
         nparr = np.frombuffer(image_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
@@ -494,27 +529,42 @@ def force_stop_game():
     time.sleep(2)
     return True
 def start_game_app():
-    """用 ADB 直接啟動遊戲（取代點擊 gameicon）"""
+    """用 ADB 直接啟動遊戲（取代點擊 gameicon），失敗時先嘗試恢復 ADB"""
     logger.info(f"用 ADB 啟動遊戲: {constants.GAME_PACKAGE}")
-    # 最穩定的啟動方式
-    run_adb_command(f"shell monkey -p {constants.GAME_PACKAGE} -c android.intent.category.LAUNCHER 1")
-    time.sleep(3)
-    return True
-def freeze_screen_check():
+    
+    for attempt in range(3):
+        result = run_adb_command(f"shell monkey -p {constants.GAME_PACKAGE} -c android.intent.category.LAUNCHER 1")
+        if result is not None:
+            time.sleep(3)
+            return True
+        
+        logger.warning(f"start_game_app 第 {attempt+1} 次失敗，嘗試恢復 ADB")
+        # 先嘗試救 ADB，而不是直接認定模擬器掛了
+        adb_path = get_adb_path()
+        
+        subprocess.run(f'"{adb_path}" kill-server', shell=True)
+        time.sleep(1)
+        subprocess.run(f'"{adb_path}" start-server', shell=True)
+        time.sleep(2)
+        connect_to_device()
+        time.sleep(2)
+    
+    logger.error("start_game_app 多次重試後仍然失敗")
+    return False
+def freeze_screen_check(mode=1):
     """
     卡死畫面檢測
+    mode 1 = regular（受冷卻時間限制）
+    mode 2 = ad hoc（強制檢查，無視冷卻，用於 harken_check 等）
     """
-    # (state) global state.current_time, state.freeze_screen_check_time, state.game_player, state.image_restart, state.first_freeze_screen_check
-    # (state) global state.freeze_high_sim_count
-
-    if 'state.freeze_high_sim_count' not in globals():
+    if not hasattr(state, 'freeze_high_sim_count'):
         state.freeze_high_sim_count = 0
 
     state.current_time = time.time()
 
+    # 第一次執行的初始化
     if state.first_freeze_screen_check:
         take_screenshot("P_screen_current")
-        # 同時複製成 previous，避免第一次比較出錯
         src = os.path.join(state.image_dir, "P_screen_current.png")
         dst = os.path.join(state.image_dir, "P_screen_previous.png")
         if os.path.exists(src):
@@ -524,74 +574,79 @@ def freeze_screen_check():
         state.freeze_high_sim_count = 0
         return False
 
-    if state.freeze_screen_check_time is not None:
-        if (state.current_time - state.freeze_screen_check_time) <= 25:   # 可自行調整門檻
-            return False
-
-        take_screenshot("P_screen_current")
-
-        # ★★★ 關鍵修改：直接從磁碟讀取，不要用 load_image ★★★
-        current_path = os.path.join(state.image_dir, "P_screen_current.png")
-        previous_path = os.path.join(state.image_dir, "P_screen_previous.png")
-
-        image_current = cv2.imread(current_path)
-        image_previous = cv2.imread(previous_path)
-
-        if image_current is None or image_previous is None:
-            logger.warning("無法讀取 current/previous 截圖，跳過本次卡死檢查")
-            state.freeze_screen_check_time = state.current_time
-            return False
-
-        # 黑畫面檢查
-        dark_pixels = np.sum(image_current < 30)
-        total_pixels = image_current.size
-        dark_ratio = dark_pixels / total_pixels
-        logger.info(f"目前畫面暗比例:{dark_ratio:.4%}")
-
-        if dark_ratio >= 0.995 or dark_ratio == 0:
-            logger.info("黑畫面/沒有畫面，先等待遊戲運行")
-            state.freeze_screen_check_time = state.current_time
-            state.freeze_high_sim_count = 0
-            return False
-
-        # 真正比對
-        result = cv2.matchTemplate(image_current, image_previous, cv2.TM_CCOEFF_NORMED)
-        _, max_val, _, _ = cv2.minMaxLoc(result)
-
-        if max_val >= 0.995:
-            state.freeze_high_sim_count += 1
-            logger.warning(f"卡死畫面疑似，連續高相似度次數: {state.freeze_high_sim_count}，當前相似度 {max_val:.4f}")
-
-            if state.freeze_high_sim_count >= 2:
-                logger.info(f"確認卡死畫面（相似度 {max_val:.2f}），開始處理")
-                # 保存 bug 圖
-                shutil.copy(previous_path, "bug_previous.png")
-                shutil.copy(current_path, "bug_current.png")
-
-                try:
-                    force_stop_game()
-                    time.sleep(2)
-                    start_game_app()
-                    time.sleep(5)
-                except Exception as e:
-                    logger.error(f"force-stop 失敗，改關模擬器: {e}")
-                    if state.game_player == "bluestack":
-                        subprocess.run(['taskkill', '/F', '/IM', 'HD-Player.exe'], check=False)
-                    elif state.game_player == "mumuplayer":
-                        subprocess.run(['taskkill', '/F', '/IM', 'mumunxdevice.exe'], check=False)
-
-                state.freeze_screen_check_time = state.current_time
-                state.freeze_high_sim_count = 0
-                return True
-            else:
-                state.freeze_screen_check_time = state.current_time
+    # ===== 冷卻判斷（只對 mode=1 生效）=====
+    if mode == 1:
+        if state.freeze_screen_check_time is not None:
+            if (state.current_time - state.freeze_screen_check_time) <= 25:
                 return False
-        else:
-            # 正常 → 更新 previous
-            state.freeze_high_sim_count = 0
-            logger.info(f"卡死畫面檢查通過，相似度 {max_val:.2f}，目標:{state.image_restart}")
-            shutil.copy(current_path, previous_path)
 
+    # 開始真正檢查
+    take_screenshot("P_screen_current")
+
+    current_path = os.path.join(state.image_dir, "P_screen_current.png")
+    previous_path = os.path.join(state.image_dir, "P_screen_previous.png")
+
+    image_current = cv2.imread(current_path)
+    image_previous = cv2.imread(previous_path)
+
+    if image_current is None or image_previous is None:
+        logger.warning("無法讀取 current/previous 截圖，跳過本次卡死檢查")
+        state.freeze_screen_check_time = state.current_time
+        return False
+
+    # 黑畫面檢查
+    dark_pixels = np.sum(image_current < 30)
+    total_pixels = image_current.size
+    dark_ratio = dark_pixels / total_pixels
+    logger.info(f"目前畫面暗比例:{dark_ratio:.4%}")
+
+    if dark_ratio >= 0.995 or dark_ratio == 0:
+        logger.info("黑畫面/沒有畫面，先等待遊戲運行")
+        state.freeze_screen_check_time = state.current_time
+        state.freeze_high_sim_count = 0
+        return False
+
+    # 比對
+    result = cv2.matchTemplate(image_current, image_previous, cv2.TM_CCOEFF_NORMED)
+    _, max_val, _, _ = cv2.minMaxLoc(result)
+
+    if max_val >= 0.995:
+        state.freeze_high_sim_count += 1
+        logger.warning(f"疑似卡死畫面，連續高相似度次數: {state.freeze_high_sim_count}，當前相似度 {max_val:.4f}")
+
+        if state.freeze_high_sim_count >= 2:
+            logger.info(f"確認卡死畫面（相似度 {max_val:.2f}），開始處理")
+            # 保存 bug 圖方便之後分析
+            shutil.copy(previous_path, "bug_previous.png")
+            shutil.copy(current_path, "bug_current.png")
+
+            try:
+                force_stop_game()
+                time.sleep(2)
+                start_game_app()
+                time.sleep(5)
+            except Exception as e:
+                logger.error(f"force-stop 失敗，改關模擬器: {e}")
+                if platform.system() == 'Windows':
+                        subprocess.run(['taskkill', '/F', '/IM', 'mumunxdevice.exe'], check=False)
+                else:
+                    # Mac MuMu 的進程名通常是 MuMuNyxDevice 或類似（需實際確認）
+                    subprocess.run(['killall', '-9', 'MuMuNyxDevice'], check=False)
+
+            state.freeze_screen_check_time = state.current_time
+            state.freeze_high_sim_count = 0
+            return True
+        else:
+            # 第一次疑似時，不要更新 freeze_screen_check_time
+            # 讓它可以很快再檢查第二次，mode=2 也能正常累積
+            return False
+    else:
+        # 畫面有變化，重置計數並更新 previous
+        state.freeze_high_sim_count = 0
+        logger.info(f"卡死畫面檢查通過，相似度 {max_val:.2f}，目標:{state.image_restart}")
+        shutil.copy(current_path, previous_path)
+
+    # 只有「確定結果」後才更新時間戳
     state.freeze_screen_check_time = state.current_time
     return False
 def load_image(image_name):
@@ -601,7 +656,8 @@ def load_image(image_name):
         logger.error(f"無法從預加載字典加載圖像: {image_name}")
         return None
     return img.copy()
-def find_image(image_list, screenshot=None, similarity=0.7, region=None, log=True, remedial=True, sim_print=False, fail_log=False, reconnect=True): #畫面上找圖片
+def find_image(image_list, screenshot=None, similarity=0.7, region=None, log=True, remedial=True, sim_print=False, 
+               fail_log=False, reconnect=True, grayscale=True): #畫面上找圖片
     """在給定的螢幕截圖中使用模板匹配查找圖像, 成功返回 image_name, (center_x, center_y), similarity, 失敗返回None"""   
     # (state) global state.image_fail_count, state.freeze_screen_check_time, state.freeze_check_status, state.failed_image_sim, state.image_restart
     if log:
@@ -635,6 +691,7 @@ def find_image(image_list, screenshot=None, similarity=0.7, region=None, log=Tru
             template = load_image(image_name)
             if template is None:
                 continue
+                        
             # 模板匹配
             result = cv2.matchTemplate(screenshot_crop, template, cv2.TM_CCOEFF_NORMED)
             _, max_val, _, max_loc = cv2.minMaxLoc(result)
@@ -1211,12 +1268,11 @@ def battle_skill(enemy_list=None): #技能戰鬥
                 time.sleep(0.5)
                 tap(553,1103, "右下技能")
                 if click_image("P_aoe_confirm", timeout=1.5, fail_count=False):
-                    continue
+                    if find_image("P_battle_noSPMP"):
+                        click_image("P_battle_noSPMP")
+                        click_image("P_battle_baseattack")
                 if find_image("P_battle_detail", region=(0,0,900,1000)):
                     tap(453,1196,"2號角色")
-                elif find_image("P_battle_noSPMP"):
-                    click_image("P_battle_noSPMP")
-                    click_image("P_battle_baseattack")
                 if validated_enemies is None:
                     for j in range (3):
                         for i in range(1,11):
@@ -1582,7 +1638,7 @@ def common_reaction(match, stage): #基本動作處理
             
         logger.info(f"進入 P_exit 處理，state.bs_restarted:{state.bs_restarted} / state.restart_relocation::{state.restart_relocation}")
         if state.bs_restarted and state.restart_relocation:
-            logger.info("BS曾重啟，重新找路中")
+            logger.info("模擬器曾重啟，重新找路中")
             state.bs_restarted = False
             tap(constants.L_Minimap[0], constants.L_Minimap[1], "小地圖")
             time.sleep(1)
@@ -1701,7 +1757,7 @@ def handle_loop(target, timeout=10000):   #動作處理loop
     loop_counter = 1
     while time.time() - start_time <= timeout:
         loop_time = time.time()
-        logger.info(f"handle_loop 計數: {loop_counter}，BS重啟記錄{state.bs_restarted}")
+        logger.info(f"handle_loop 計數: {loop_counter}，模擬器重啟記錄{state.bs_restarted}")
         match = wait_image(state.images_list, similarity=0.7)
         if match == None:
             loop_counter += 1
@@ -1898,6 +1954,19 @@ def rock_pre():
             state.handle_loop_list.append(name)
             state.on9npc_list.append(name)
     logger.info(f"首次執行，增加所需變數，目前handle_loop_list:{state.handle_loop_list}")
+def harken_check(target): #哈肯卡死檢測
+    """哈肯卡死檢測"""
+    if not find_image("P_back"):
+        click_image("P_buff")
+    click_image("P_back")
+    logger.info("哈肯卡死檢測開始")
+    for i in range(5):
+        if not wait_image(target,timeout=5):
+            if freeze_screen_check(mode=2):
+                return False
+        else:
+            break
+    return True
 
 # 其他函數
 def press_key(key, duration=350):   #地城上下左右滑動
@@ -1930,7 +1999,7 @@ def random_delay(fixed=0.0):    #隨機延遲
     delay = fixed + random.uniform(0.2, 2)
     logger.info(f"將隨機等待 {delay:.2f}秒")
     time.sleep(delay)
-def switch_wheel(point, chapter, point_sim=0.7, final_click=True):    #切換咀咒之輪
+def switch_wheel(point, chapter, point_sim=0.7, final_click=True):    #切換詛咒之輪
     if find_image(point, similarity=point_sim):
         click_image(point, similarity=point_sim)
         if final_click:
@@ -1969,5 +2038,5 @@ def switch_wheel(point, chapter, point_sim=0.7, final_click=True):    #切換咀
             if final_click:
                 click_image("P_wheel_jump")
             return True
-
-#主腳本
+def fish(): #釣魚
+    return True

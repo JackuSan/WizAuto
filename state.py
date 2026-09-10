@@ -69,3 +69,4 @@ app = None
 
 # 卡死檢查輔助
 freeze_high_sim_count = 0
+last_player_restart_time = 0

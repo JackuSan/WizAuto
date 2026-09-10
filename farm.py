@@ -1076,31 +1076,6 @@ def Farm_ch2B1F():
 def Farm_ch3B7F():
     """第三章第七區刷巨人"""
     # (state) global state.run_count, state.paused, state.trap_char_all_scared, state.inn_mode, state.heal_period, state.glant_count, state.debuff_list, state.list_update_status
-    def battle_handle():
-        for i in range(20):
-            match = wait_image(["P_battle_bar", "P_chest_open", "P_exit", "P_battle_death_main", "P_battle_death_npc1", "P_battle_death_npc2"], 
-                               similarity=0.8)
-            if match == "P_battle_bar":
-                time.sleep(0.5)
-                tap(553,1103, "右下技能")
-                if not click_image("P_aoe_confirm", timeout=2):
-                    tap(450, 800, "巨人")
-                    tap(722, 839, "巨人同排女妖")
-                    tap(654, 703, "後排右女妖")
-                    tap(250, 703, "後排左女妖")
-            elif match == "P_chest_open":
-                open_chest()
-            elif match == "P_exit":
-                if image_stability("P_exit", max_attempts=1):
-                    break
-            elif match == "P_battle_death_main":
-                revive_main()
-                wait_image("P_exit")
-                time.sleep(1)
-                press_key("w")
-            elif match in ["P_battle_death_npc1", "P_battle_death_npc2"]:
-                revive_npc()
-    
     enemy = [(450, 800, "巨人"),(722, 839, "巨人同排女妖"),(654, 703, "後排右女妖"),(250, 703, "後排左女妖")]
     
     try:
@@ -1144,19 +1119,20 @@ def Farm_ch3B7F():
                 click_image("P_fastbattle_inactive")
             state.glant_count += 1
             run_count_bol = True
-            #battle_handle()
-            battle_skill([(450, 850, "目標")])
+            battle_skill(enemy)
         exitMap(["P_back", "P_buff"], heal_check=False)
+        """
         if not find_image("P_back"):
             click_image("P_buff")
         click_image("P_back")
         wait_image("P_ch3_outside")
+        """
+        core.harken_check("P_ch3_outside")
         logger.info(f"state.glant_count: {state.glant_count}")
-        if state.glant_count:
-            if state.glant_count%state.heal_period == 0:
-                general_inn_mode(mode=1)
-                wait_image("P_ch3_outside")
-                state.glant_count = 0
+        if state.glant_count != 0 and (state.run_count+1)%state.heal_period == 0:
+            general_inn_mode(mode=1)
+            wait_image("P_ch3_outside")
+            state.glant_count = 0
         if run_count_bol == True:
             state.run_count += 1
             logger.info(f"第三章第七區刷巨人周回完成，當前次數: {state.run_count}")
@@ -2395,6 +2371,7 @@ def test():
             while state.paused and not state.stop_event.is_set():
                 time.sleep(0.1)
         #在此輸入
+        core.fish()
         
         state.run_count += 1
     except StopIteration:
