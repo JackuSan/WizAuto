@@ -6,24 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            artifact_name: WizAuto-Windows
-            script: |
-              pip install -r requirements.txt
-              pyinstaller --noconfirm --onefile --windowed --add-data "images;images" --add-data "platform-tools/windows;platform-tools" --name="WizAuto.v4.4.1" main.pyw
-          - os: macos-latest
-            artifact_name: WizAuto-macOS
-            script: |
-              pip install -r requirements.txt
-              chmod +x platform-tools/mac/adb
-              pyinstaller --noconfirm --onefile --windowed --add-data "images:images" --add-data "platform-tools/mac:platform-tools" --name="WizAuto.v4.4.1" main.pyw
-
-    runs-on: ${{ matrix.os }}
-
+  build-windows:
+    runs-on: windows-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -33,11 +17,40 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Build Application
-        run: ${{ matrix.script }}
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build Windows Executable
+        run: pyinstaller --noconfirm --onefile --windowed --add-data "images;images" --add-data "platform-tools/windows;platform-tools" --name="WizAuto.v4.4.1" main.pyw
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: WizAuto-Windows
+          path: dist/WizAuto.v4.4.1*
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Make adb executable
+        run: chmod +x platform-tools/mac/adb
+
+      - name: Build macOS Executable
+        run: pyinstaller --noconfirm --onefile --windowed --add-data "images:images" --add-data "platform-tools/mac:platform-tools" --name="WizAuto.v4.4.1" main.pyw
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WizAuto-macOS
           path: dist/WizAuto.v4.4.1*
