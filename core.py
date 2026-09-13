@@ -1827,8 +1827,8 @@ def goMap(checkpoint, until, swipe_action=None, timeout=6000, relocation=True, g
             else:
                 exitLog("swipe_action變數數目不正確")
         for i in range(3):
-            if find_image(checkpoint, similarity=goMap_similarity-i*0):
-                click_image(checkpoint, timeout=3, similarity=goMap_similarity-i*0)
+            if find_image(checkpoint, similarity=goMap_similarity-i*0.03, fail_log=True):
+                click_image(checkpoint, timeout=3, similarity=goMap_similarity-i*0.03)
                 if click_image("P_Cmove", timeout=3, similarity=0.65):
                     break
     logger.info(f"前往 {checkpoint}")
