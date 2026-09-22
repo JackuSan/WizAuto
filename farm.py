@@ -62,6 +62,7 @@ waitBattleVanish = core.waitBattleVanish
 force_stop_game = core.force_stop_game
 start_game_app = core.start_game_app
 game_restart = core.game_restart
+harken_check = core.harken_check
 
 def Farm_7000g():
     """皇女7000g刷錢"""
@@ -91,6 +92,7 @@ def Farm_7000g():
                 click_image("P_back")
             else:
                 exitLog("沒有找到正確結果")
+        harken_check("P_town")
         click_image("P_town")
         click_image("P_dialog_knight")
         inn_check()
@@ -153,10 +155,10 @@ def Farm_BrokeUpCave1():
         goToDungeon_check()
         wait_image("P_Minimap_BrokeUpCave_B2F")
         goMap("P_BrokeUpCave_checkpoint1", "P_Minimap_BrokeUpCave_B3F")
-        #find_chest_process()
         find_chest_auto()
         exitMap("P_back")
         click_image("P_back")
+        harken_check("P_BrokeUpCave")
         wait_image("P_BrokeUpCave")
         general_inn_mode(mode=1)
         wait_image("P_town")
@@ -846,7 +848,7 @@ def Farm_CowCave2():
     except StopIteration:
         logger.info("主循環被中斷，腳本終止")
         raise
-def Farm_expCH2():
+
     """刷經驗任務之第二章擊退敵方勢力"""
     # (state) global state.run_count, state.paused, state.trap_char_all_scared, state.handle_loop_list, state.inn_mode
     def battle_handle():
@@ -896,7 +898,7 @@ def Farm_expCH2():
             battle_handle()
             click_image("P_expCH2_optionB")
         exitMap("P_back")
-        click_image("P_back")
+        harken_check("P_town")
         click_image("P_town")
         inn_check()
         inn_rest()
@@ -955,6 +957,7 @@ def Farm_expCH2_2():
         if not find_image("P_back"):
             click_image("P_buff")
         click_image("P_back")
+        harken_check("P_ch2_outside")
         if state.inn_mode == 2:
             click_image("P_town")
             inn_check()
@@ -1019,6 +1022,7 @@ def Farm_ch2B9F():
         if not find_image("P_back"):
             click_image("P_buff")
         click_image("P_back")
+        harken_check("P_ch2_outside")
         wait_image("P_ch2_outside")
         general_inn_mode(mode=1)
         wait_image("P_town")
@@ -1050,21 +1054,10 @@ def Farm_ch2B1F():
         click_image("P_ch2_B1F")
         goToDungeon_check()
         wait_image("P_exit")
-        #find_chest_process()
         find_chest_auto()
         exitMap(["P_back", "P_buff", "P_ch2_outside"])
-        check = find_image(["P_back", "P_buff", "P_ch2_outside"])
-        if check:
-            image = check[0]
-            if image == "P_buff":
-                click_image("P_buff")
-                click_image("P_back")
-            elif image == "P_back":
-                click_image("P_back")
-            elif image == "P_ch2_outside":
-                pass
-            else:
-                exitLog("沒有找到正確結果")
+        find_image(["P_back", "P_buff", "P_ch2_outside"])
+        harken_check("P_ch2_outside")
         wait_image("P_ch2_outside")
         general_inn_mode(mode=1)
         wait_image("P_town")
@@ -1121,13 +1114,7 @@ def Farm_ch3B7F():
             run_count_bol = True
             battle_skill(enemy)
         exitMap(["P_back", "P_buff"], heal_check=False)
-        """
-        if not find_image("P_back"):
-            click_image("P_buff")
-        click_image("P_back")
-        wait_image("P_ch3_outside")
-        """
-        core.harken_check("P_ch3_outside")
+        harken_check("P_ch3_outside")
         logger.info(f"state.glant_count: {state.glant_count}")
         if state.glant_count != 0 and (state.run_count+1)%state.heal_period == 0:
             general_inn_mode(mode=1)
@@ -1163,15 +1150,8 @@ def Farm_ch4B1F():
         goToDungeon_check()
         wait_image("P_exit")
         goMap("P_ch4_B1F_checkpoint1", "P_ch4_B1F_minimap1", goMap_similarity=0.65)
-        check = exitMap(["P_back", "P_buff"])
-        if check:
-            if check == "P_buff":
-                click_image("P_buff")
-                click_image("P_back")
-            elif check == "P_back":
-                click_image("P_back")
-            else:
-                exitLog("沒有找到正確結果")
+        exitMap(["P_back", "P_buff"])
+        harken_check("P_ch4_outside")
         wait_image("P_ch4_outside")
         if (state.run_count+1)%state.heal_period == 0:
             general_inn_mode(mode=1)
@@ -1202,15 +1182,8 @@ def Farm_ch4B4F():
         wait_image("P_exit")
         goToMark("P_ch4_B4F_minimap1")
         goToMark("P_ch4_B4F_minimap6")
-        check = exitMap(["P_back", "P_buff"])
-        if check:
-            if check == "P_buff":
-                click_image("P_buff")
-                click_image("P_back")
-            elif check == "P_back":
-                click_image("P_back")
-            else:
-                exitLog("沒有找到正確結果")
+        exitMap(["P_back", "P_buff"])
+        harken_check("P_ch4_outside")
         wait_image("P_ch4_outside")
         if (state.run_count+1)%state.heal_period == 0:
             store_equip("P_ch4_SnowHat")
@@ -1250,15 +1223,8 @@ def Farm_ch4B6F():
             click_image("P_onsen_rest2")
             click_image("P_onsen_dialog1")
             wait_image("P_exit")
-        check = exitMap(["P_back", "P_buff"])
-        if check:
-            if check == "P_buff":
-                click_image("P_buff")
-                click_image("P_back")
-            elif check == "P_back":
-                click_image("P_back")
-            else:
-                exitLog("沒有找到正確結果")
+        exitMap(["P_back", "P_buff"])
+        harken_check("P_ch4_outside")
         wait_image("P_ch4_outside")
         if (state.run_count+1)%state.heal_period == 0:
             general_inn_mode(mode=1)
@@ -1289,15 +1255,8 @@ def Farm_ch4B7F():
         goToDungeon_check()
         wait_image("P_exit")
         find_chest_auto()
-        check = exitMap(["P_back", "P_buff"])
-        if check:
-            if check == "P_buff":
-                click_image("P_buff")
-                click_image("P_back")
-            elif check == "P_back":
-                click_image("P_back")
-            else:
-                exitLog("沒有找到正確結果")
+        exitMap(["P_back", "P_buff"])
+        harken_check("P_ch4_outside")
         wait_image("P_ch4_outside")
         if (state.run_count+1)%state.heal_period == 0:
             general_inn_mode(mode=1)
@@ -1326,7 +1285,7 @@ def Farm_ch4B7F_2():
         wait_image("P_exit")
         goToMark("P_ch4_B7F_minimap1")
         goToMark("P_ch4_B6F_minimap3")
-        check = exitMap(["P_back", "P_buff", "P_ch4_B7F_inside"])
+        exitMap(["P_back", "P_buff", "P_ch4_B7F_inside"])
         if not find_image("P_back"):
             click_image("P_buff")
         else:
@@ -1356,7 +1315,7 @@ def Farm_ScorpionGirl():
         goMap("P_GrudgeCave_checkpoint1", "P_GrudgeCave_minimap1", swipe_action=(450, 600, 450, 900,500))
         time.sleep(1)
         exitMap("P_back")
-        click_image("P_back")
+        harken_check("P_GrudgeCave")
         wait_image("P_GrudgeCave")
         general_inn_mode(mode=1)
         wait_image("P_town")
@@ -1385,8 +1344,7 @@ def Farm_GrudgeCave():
         wait_image("P_exit")
         goToMark()
         exitMap(["P_back"])
-        click_image("P_back")
-        wait_image("P_town")
+        harken_check("P_GrudgeCave")
         wait_image("P_GrudgeCave")
         general_inn_mode(mode=1)
         wait_image("P_town")
@@ -1465,10 +1423,8 @@ def Farm_bounty_ScorpionGirl():
         else:
             reteam()
         goToMark()
-        check = exitMap(["P_back", "P_buff"], heal_check=False)
-        if check == "P_buff":
-            click_image("P_buff")
-        click_image("P_back")
+        exitMap(["P_back", "P_buff"], heal_check=False)
+        harken_check("P_town")
         wait_image("P_town")
         if state.inn_mode == 1:
             general_inn_mode(mode=1)
@@ -1542,11 +1498,8 @@ def Farm_bounty_CowMan():
         else:
             reteam()
         goToMark("P_bounty_cow_minimap")    
-        #battle_handle()
-        check = exitMap(["P_back", "P_buff"], heal_check=False)
-        if check == "P_buff":
-            click_image("P_buff")
-        click_image("P_back")
+        exitMap(["P_back", "P_buff"], heal_check=False)
+        harken_check("P_town")
         wait_image("P_town")
         if state.inn_mode == 1:
             general_inn_mode(mode=1)
@@ -1647,10 +1600,8 @@ def Farm_bounty_faker():
             else:
                 wait_image("P_exit")
                 break
-        check = goMap("P_bounty_faker_checkpoint2", ["P_back", "P_buff"], swipe_action=[None, (300, 800, 600, 800, 500)])
-        if check == "P_buff":
-            click_image("P_buff")
-        click_image("P_back")
+        goMap("P_bounty_faker_checkpoint2", ["P_back", "P_buff"], swipe_action=[None, (300, 800, 600, 800, 500)])
+        harken_check("P_town")
         wait_image("P_town")
         if state.inn_mode == 1:
             general_inn_mode(mode=1)
@@ -1705,7 +1656,6 @@ def Farm_FlowerGarden1():
         else:
             exitLog("find_image沒有找到任何結果")
         wait_image("P_exit")
-        #find_chest_process()
         find_chest_auto()
         exitMap("P_map_FlowerGarden")
         if (state.inn_mode == 3 or state.inn_mode == 4) and (state.run_count+1)%state.heal_period == 0:
@@ -2294,7 +2244,7 @@ def Farm_FF11_B2F_mine():
         logger.info("主循環被中斷，腳本終止")
         raise
 def Farm_ch4B10F_SnowGlant():
-    """第四章B10F周回雪巨人"""
+    """第四章B10F周回右下雪巨人"""
     # (state) global state.run_count, state.paused, state.trap_char_all_scared, state.inn_mode, state.heal_period
     enemy = [(450,850, "雪巨人")]
     try:
@@ -2310,47 +2260,32 @@ def Farm_ch4B10F_SnowGlant():
         if state.inn_mode == 2:
             exitLog("此腳本不能使用「地城露營」休息模式")
         ch4_pre()
-        click_image("P_house")
-        click_image("P_wheel")
-        wait_image("P_wheel_special_request")
-        time.sleep(2)
-        switch_wheel("P_wheel_ch4_minerequest", 4)
-        inn_check()
-        click_image("P_house")
-        click_image("P_wheel")
-        wait_image("P_wheel_special_request")
-        time.sleep(2)
-        switch_wheel("P_wheel_ch4_thetruth", 4)
-        inn_check()
-        map_click()
-        for i in range(2):
-            tap(constants.L_map_scalesmall[0], constants.L_map_scalesmall[1], "縮小地圖")
-            time.sleep(0.5)
-        swipe(450, 800, 700, 800)
-        tap(constants.L_map_scalebig[0],constants.L_map_scalebig[1], "放大地圖")
-        time.sleep(1)
-        click_image("P_chapter4")
         click_image("P_outside")
         click_image("P_ch4_outside")    
         time.sleep(0.5)
         click_image("P_ch4_B10F")
         goToDungeon_check()
         wait_image("P_exit")
-        goToMark("P_ch4_B10F_minimap2")
-        press_key("w")
-        battle_skill([(450, 850, "目標")])
-        goMap("P_ch4_B10F_checkpoint2", "P_ch4_B10F_until2", goMap_similarity=0.65)
-        goMap("P_ch4_B10F_checkpoint3", "P_ch4_B10F_until3")
-        exitMap(["P_buff", "P_back"])
-        check = exitMap(["P_back", "P_buff"])
-        if check:
-            if check == "P_buff":
-                click_image("P_buff")
-                click_image("P_back")
-            elif check == "P_back":
-                click_image("P_back")
+        #check = goMap("P_ch4_B10F_checkpoint4", ["P_ch4_B10F_until4_1", "P_ch4_B10F_until4_2"], goMap_similarity=0.8)
+        check = goMap("P_ch4_B10F_checkpoint4", ["P_ch4_B10F_until4_1"], goMap_similarity=0.7)
+        heal()
+        if check == "P_ch4_B10F_until4_1":
+            press_key("w")
+            wait_image("P_battle_wait")
+            if find_image("P_Monster_Yeti", fail_log=True):
+                for i in range(10):
+                                    click_image("P_battle_escape")
+                                    if wait_image(["P_battle_escape", "P_exit"]) == "P_exit":
+                                        break
+            elif find_image("P_ch4_B10F_SnowGlant", similarity=0.85,fail_log=True):
+                battle_skill([(450, 850, "目標")])
             else:
-                exitLog("沒有找到正確結果")
+                for i in range(10):
+                    click_image("P_battle_escape")
+                    if wait_image(["P_battle_escape", "P_exit"]) == "P_exit":
+                        break
+        exitMap(["P_buff", "P_back"])
+        core.harken_check("P_village")
         click_image("P_village")
         inn_check()
         inn_rest()
@@ -2359,6 +2294,7 @@ def Farm_ch4B10F_SnowGlant():
     except StopIteration:
         logger.info("主循環被中斷，腳本終止")
         raise
+
 
 def test():
     # (state) global state.run_count, state.paused, state.trap_char_all_scared, state.inn_mode
@@ -2371,7 +2307,7 @@ def test():
             while state.paused and not state.stop_event.is_set():
                 time.sleep(0.1)
         #在此輸入
-        core.fish()
+        find_image("P_ch4_B10F_SnowGlant", fail_log=True)
         
         state.run_count += 1
     except StopIteration:

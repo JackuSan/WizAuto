@@ -128,42 +128,64 @@ def check_requirements():   #檢查圖片包
         logger.error(f"ADB 可執行文件 {adb_path} 不存在")
         messagebox.showerror("錯誤", f"ADB 可執行文件 {adb_path} 不存在，請確保 platform-tools 資料夾中包含 adb程式")
         exit(1)
-def connect_to_device():    #連接adb
+def connect_to_device():
     """
     嘗試連接 ADB 並確認設備 online。
-    返回 True 如果成功，False 否則。
+    回傳 True 如果成功，False 否則。
     """
     adb_path = get_adb_path()
-    
-    # 先執行 connect
+
+    # 1. 先執行 connect
     connect_cmd = f'"{adb_path}" connect {constants.ADB_HOST}:{state.adb_port}'
     try:
-        result_connect = subprocess.run(connect_cmd, shell=True, capture_output=True, text=True)
-        output_connect = result_connect.stdout.strip().lower()
-        if result_connect.stdout:
-            logger.info(f"ADB connect 輸出: {result_connect.stdout.strip()}")
-        
-        if result_connect.returncode != 0 or "connected" not in output_connect:
-            logger.warning("ADB connect 未成功，繼續檢查 devices")
-            return False  # connect 失敗，但不 raise，讓呼叫者重試
+        result_connect = subprocess.run(connect_cmd,shell=True,capture_output=True,text=True,timeout=8)
+        stdout = result_connect.stdout or ""
+        stderr = result_connect.stderr or ""
+
+        if stdout.strip():
+            logger.info(f"ADB connect 輸出: {stdout.strip()}")
+        if stderr.strip():
+            logger.debug(f"ADB connect stderr: {stderr.strip()}")
+
+        output_connect = stdout.strip().lower()
+
+        # 判斷是否成功（常見成功訊息：connected / already connected）
+        if result_connect.returncode != 0 or (
+            "connected" not in output_connect and "already connected" not in output_connect
+        ):
+            logger.warning(f"ADB connect 未成功: returncode={result_connect.returncode}")
+            return False
+
+    except subprocess.TimeoutExpired:
+        logger.error("ADB connect 超時")
+        return False
     except Exception as e:
         logger.error(f"ADB connect 異常: {e}")
         return False
-    
-    # 再檢查 devices 確保 online
+
+    # 2. 再檢查 devices 確保 online
     devices_cmd = f'"{adb_path}" -s {constants.ADB_HOST}:{state.adb_port} devices'
     try:
-        result_devices = subprocess.run(devices_cmd, shell=True, capture_output=True, text=True)
-        output_devices = result_devices.stdout.strip()
-        if result_devices.stdout:
-            logger.info(f"ADB devices 輸出: {output_devices}")
-        
-        if 'device' in output_devices and 'offline' not in output_devices:
+        result_devices = subprocess.run(devices_cmd,shell=True,capture_output=True,text=True,timeout=8)
+        stdout = result_devices.stdout or ""
+        stderr = result_devices.stderr or ""
+
+        if stdout.strip():
+            logger.info(f"ADB devices 輸出: {stdout.strip()}")
+
+        output_devices = stdout.strip().lower()
+
+        # 必須包含 "device" 且不能有 "offline"
+        if "device" in output_devices and "offline" not in output_devices:
             logger.info(f"ADB 設備 {constants.ADB_HOST}:{state.adb_port} 已 online")
             return True
         else:
             logger.warning("ADB 設備仍 offline 或 unauthorized")
             return False
+
+    except subprocess.TimeoutExpired:
+        logger.error("ADB devices 檢查超時")
+        return False
     except Exception as e:
         logger.error(f"ADB devices 檢查異常: {e}")
         return False
@@ -212,8 +234,8 @@ def game_restart():
 
     # 階段式等待清單（避免點完還繼續找）
     stage1_list = ["P_start1", "P_start2", "P_download"]          # 啟動畫面
-    stage2_list = ["P_autobattle_inactive", "P_autobattle_inactive0", 
-                   "P_autobattle_inactive1", "P_exit", "P_chest_open"]  # 已進入遊戲
+    stage2_list = ["P_autobattle_inactive", "P_autobattle_inactive0", "P_autobattle_inactive1", "P_autobattle_inactive2",
+                   "P_fastbattle_inactive", "P_exit", "P_chest_open", "P_battle_wait", "P_inn"]  # 已進入遊戲
 
     if state.image_restart:
         for image in state.image_restart:
@@ -246,7 +268,7 @@ def game_restart():
                 click_image("P_start2", timeout=3)
                 clicked_start2 = True
                 logger.info("已點擊 P_start2，進入等待進入遊戲階段")
-                time.sleep(8)          # 多等一點，避免畫面還沒跳走
+                time.sleep(5)
                 continue
             elif name == "P_download":
                 logger.info("需要下載資料，點擊下載")
@@ -256,14 +278,15 @@ def game_restart():
 
         # 已經點過 start2 後，改找 stage2
         if clicked_start2 or clicked_start1:
-            check2 = find_image(stage2_list, log=False, remedial=False)
+            check2 = find_image(stage2_list, log=True, remedial=False)
             if check2:
                 name2 = check2[0]
                 logger.info(f"偵測到已進入遊戲畫面: {name2}")
-                if name2 in ["P_autobattle_inactive", "P_autobattle_inactive0", "P_autobattle_inactive1"]:
+                if name2 in ["P_autobattle_inactive", "P_autobattle_inactive0", "P_autobattle_inactive1", "P_autobattle_inactive2",
+                             "P_fastbattle_inactive"]:
                     tap(450, 50, "點擊取消遊戲暫停")
                     if state.battle_mode == "自動戰鬥":
-                        click_image(["P_autobattle_inactive", "P_autobattle_inactive0", "P_autobattle_inactive1"])
+                        click_image(["P_autobattle_inactive", "P_autobattle_inactive0", "P_autobattle_inactive1", "P_autobattle_inactive2"], timeout=3)
                 elif state.image_restart and name2 in state.image_restart:
                     if state.image_stage == "click":
                         click_image(state.image_restart)
@@ -464,53 +487,78 @@ def take_screenshot(name=None, region=None):    #截圖
     # 定義 full_command，透過管道流直接讀取二進制數據 (-p 代表 png 格式)
     full_command = f'"{adb_path}" -s {constants.ADB_HOST}:{state.adb_port} shell screencap -p'
     
-    try:
-        # 加上 5 秒超時，萬一 ADB 發生記憶體洩漏卡死，Python 會自動捕捉，而不會無限掛起塞爆 Windows
-        result = subprocess.run(full_command, shell=True, capture_output=True, timeout=5)
-        
-        if result.returncode != 0 or not result.stdout:
-            logger.error("ADB 記憶體截圖失敗，可能 ADB 服務暫時離線")
-            return None
-            
-        # 將二進制數據轉換為 OpenCV 圖像
-        if platform.system() == 'Windows':
-            image_bytes = result.stdout.replace(b'\r\n', b'\n')
-        else:
-            image_bytes = result.stdout
-        
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        
-        if img is None:
-            logger.error("無法解碼記憶體中的截圖數據")
-            return None
-            
-        # 裁剪指定範圍
-        if region:
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result = subprocess.run(full_command,shell=True,capture_output=True,timeout=5)
+
+            # 安全取得 stdout / stderr
+            stdout = result.stdout if result.stdout is not None else b""
+            stderr = result.stderr if result.stderr is not None else b""
+
+            if result.returncode != 0 or not stdout:
+                logger.warning(
+                    f"ADB 截圖失敗 (attempt {attempt}/{max_attempts})，"
+                    f"returncode={result.returncode}，stderr={stderr.decode(errors='ignore').strip()}"
+                )
+                raise RuntimeError("ADB screencap failed")
+
+            # Windows 需要把 \r\n 轉成 \n
+            if platform.system() == "Windows":
+                image_bytes = stdout.replace(b"\r\n", b"\n")
+            else:
+                image_bytes = stdout
+
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            if img is None:
+                logger.warning(f"無法解碼截圖資料 (attempt {attempt}/{max_attempts})")
+                raise RuntimeError("cv2.imdecode failed")
+
+            # 成功取得圖像，跳出重試迴圈
+            break
+
+        except Exception as e:
+            logger.warning(f"ADB 截圖異常 (attempt {attempt}/{max_attempts}): {e}")
+
+            if attempt < max_attempts:
+                # 嘗試恢復 ADB
+                logger.info("嘗試恢復 ADB 服務...")
+                try:
+                    subprocess.run(f'"{adb_path}" kill-server', shell=True, timeout=5)
+                    time.sleep(1)
+                    subprocess.run(f'"{adb_path}" start-server', shell=True, timeout=5)
+                    time.sleep(2)
+                    connect_to_device()   # 重新連線
+                    time.sleep(1)
+                except Exception as recover_e:
+                    logger.warning(f"ADB 恢復過程發生錯誤: {recover_e}")
+            else:
+                # 最後一次仍失敗
+                logger.error("ADB 記憶體截圖失敗，可能 ADB 服務暫時離線")
+                return None
+
+    # 走到這裡代表已成功取得 img
+    # 處理 region 裁切
+    if region is not None:
+        try:
             x, y, w, h = region
             img = img[y:y+h, x:x+w]
-            if img.size == 0:
-                logger.error(f"裁剪後圖像為空，region={region}")
-                return None
-                
-        # 如果有傳入 name，代表需要存檔（例如隊伍排位截圖 P_char1 等）
-        if name:
-            local_path = os.path.join(state.image_dir, f"{name}.png")
-            cv2.imwrite(local_path, img)
-            logger.info(f"圖像已保存到: {local_path}")
-            
-        return img
-        
-    except subprocess.TimeoutExpired:
-        logger.warning("【⚠️ 警告】截圖超時！檢測到 ADB 響應延遲，正在強制重啟 Python ADB 服務以釋放記憶體...")
-        # 如果超時，主動斬斷卡死的 adb 進程，並重啟 adb server 進行自癒
-        subprocess.run(f'"{adb_path}" kill-server', shell=True)
-        time.sleep(2)
-        subprocess.run(f'"{adb_path}" start-server', shell=True)
-        return None
-    except Exception as e:
-        logger.error(f"捕獲螢幕截圖失敗: {e}")
-        return None
+        except Exception as e:
+            logger.error(f"region 裁切失敗: {e}")
+            return None
+
+    # 若有指定 name，存檔
+    if name is not None:
+        try:
+            save_path = os.path.join(state.image_dir, f"{name}.png")
+            cv2.imwrite(save_path, img)
+            logger.info(f"圖像已保存到: {save_path}")
+        except Exception as e:
+            logger.error(f"存檔失敗 ({name}): {e}")
+
+    return img
 def tap(x, y, name=None, log=True):  #點擊坐標
     """在設備上的指定坐標 (x, y) 模擬點擊"""
     run_adb_command(f"shell input tap {x} {y}")
@@ -554,6 +602,7 @@ def start_game_app():
 def freeze_screen_check(mode=1):
     """
     卡死畫面檢測
+    mode 0 = 更新圖
     mode 1 = regular（受冷卻時間限制）
     mode 2 = ad hoc（強制檢查，無視冷卻，用於 harken_check 等）
     """
@@ -563,7 +612,7 @@ def freeze_screen_check(mode=1):
     state.current_time = time.time()
 
     # 第一次執行的初始化
-    if state.first_freeze_screen_check:
+    if state.first_freeze_screen_check or mode == 0:
         take_screenshot("P_screen_current")
         src = os.path.join(state.image_dir, "P_screen_current.png")
         dst = os.path.join(state.image_dir, "P_screen_previous.png")
@@ -601,18 +650,39 @@ def freeze_screen_check(mode=1):
     logger.info(f"目前畫面暗比例:{dark_ratio:.4%}")
 
     if dark_ratio >= 0.995 or dark_ratio == 0:
-        logger.info("黑畫面/沒有畫面，先等待遊戲運行")
-        state.freeze_screen_check_time = state.current_time
-        state.freeze_high_sim_count = 0
-        return False
+        state.freeze_high_sim_count += 1
+        logger.warning(f"疑似黑畫面卡死，連續次數: {state.freeze_high_sim_count}，暗比例 {dark_ratio:.4%}")
+
+        if state.freeze_high_sim_count >= 3:   # 連續 3 次黑畫面就確認卡死
+            logger.info("確認黑畫面卡死，開始處理")
+            # 下面直接走原本的重啟流程
+            try:
+                force_stop_game()
+                time.sleep(2)
+                start_game_app()
+                time.sleep(5)
+            except Exception as e:
+                logger.error(f"force-stop 失敗，改關模擬器: {e}")
+                if platform.system() == 'Windows':
+                    subprocess.run(['taskkill', '/F', '/IM', 'mumunxdevice.exe'], check=False)
+                else:
+                    subprocess.run(['killall', '-9', 'MuMuNyxDevice'], check=False)
+
+            state.freeze_screen_check_time = state.current_time
+            state.freeze_high_sim_count = 0
+            return True
+        else:
+            # 還沒到 3 次，先不更新時間戳，讓它可以快速再檢查
+            return False
 
     # 比對
     result = cv2.matchTemplate(image_current, image_previous, cv2.TM_CCOEFF_NORMED)
     _, max_val, _, _ = cv2.minMaxLoc(result)
 
-    if max_val >= 0.995:
+    val_threshold = 0.88
+    if max_val >= val_threshold:
         state.freeze_high_sim_count += 1
-        logger.warning(f"疑似卡死畫面，連續高相似度次數: {state.freeze_high_sim_count}，當前相似度 {max_val:.4f}")
+        logger.warning(f"疑似卡死畫面，連續高相似度次數: {state.freeze_high_sim_count}，當前相似度 {max_val:.4f}，門檻{val_threshold}")
 
         if state.freeze_high_sim_count >= 2:
             logger.info(f"確認卡死畫面（相似度 {max_val:.2f}），開始處理")
@@ -1262,7 +1332,8 @@ def battle_skill(enemy_list=None): #技能戰鬥
         logger.info(f"技能戰鬥目標敵人: {validated_enemies}")
     
     for i in range(100):
-            match = wait_image(["P_battle_bar", "P_chest_open", "P_exit", "P_battle_death_main", "P_battle_death_npc1", "P_battle_death_npc2"], 
+            match = wait_image(["P_battle_bar", "P_chest_open", "P_exit", "P_battle_death_main", "P_battle_death_npc1", "P_battle_death_npc2", 
+                                "P_fastbattle_inactive"], 
                                similarity=0.8)
             if match == "P_battle_bar":
                 time.sleep(0.5)
@@ -1286,6 +1357,8 @@ def battle_skill(enemy_list=None): #技能戰鬥
                     for x, y, note in validated_enemies:
                         tap(x, y, note)
                         time.sleep(0.15)
+            elif match == "P_fastbattle_inactive":
+                click_image("P_fastbattle_inactive")
             elif match == "P_chest_open":
                     open_chest()
             elif match == "P_exit":
@@ -1797,6 +1870,7 @@ def goMap(checkpoint, until, swipe_action=None, timeout=6000, relocation=True, g
             match = result[0]
             if match == "P_minimap_close":
                 logger.info("找到 P_minimap_close，地圖界面檢查完成")
+                time.sleep(1)
                 break
             elif match == "P_exit":
                 logger.info("找到 P_exit，點擊小地圖")
@@ -1956,12 +2030,15 @@ def rock_pre():
     logger.info(f"首次執行，增加所需變數，目前handle_loop_list:{state.handle_loop_list}")
 def harken_check(target): #哈肯卡死檢測
     """哈肯卡死檢測"""
+    if find_image(target):
+        return True
     if not find_image("P_back"):
         click_image("P_buff")
     click_image("P_back")
     logger.info("哈肯卡死檢測開始")
-    for i in range(5):
-        if not wait_image(target,timeout=5):
+    freeze_screen_check(mode=0)
+    for i in range(10):
+        if not wait_image(target,timeout=3, fail_count=False):
             if freeze_screen_check(mode=2):
                 return False
         else:

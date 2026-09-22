@@ -3,7 +3,7 @@
 import os
 
 GAME_PACKAGE = "jp.co.drecom.wizardry.daphne"
-VERSION = "4.4.1"
+VERSION = "4.4.2"
 ADB_HOST = "127.0.0.1"
 DEFAULT_IMAGE_DIR = "./images/"
 
@@ -56,8 +56,9 @@ script_remainder = {
                               "提示": ["1. 不設休息", "2. 請在B7F兩個位置加標記及打通通道", "3. 請不要在B6F增加任何標記"]},
             "第四章B10F雪巨人": {"起點": "任一章城鎮", 
                                 "旅館" : ["不休息", "野外補給", "標準房", "豪華房"],
-                                "異常狀態": "無",
-                                "提示": ["1. 請在B10F的三個位置加標記"]},
+                                "異常狀態": "凍僵, 詛咒",
+                                "提示": ["1. 請在B10F的指定位置加標記", "2. 請對指定樹使用逆轉右手", "3. 請打開「總是取消自動戰鬥」",
+                                       "4. 建議帶治療師解凍僵", "5. 會出不同的垃圾裝備, 小心爆背包"]},
             "擊退敵方勢力(固定開技版)": {"起點": "第二章郊外", 
                               "旅館" : ["地城露營", "標準房", "豪華房"],
                               "異常狀態": "無", 
@@ -393,6 +394,7 @@ image_files = {
     "P_aoe_nil": "P_aoe_nil.png",
     "P_aoe_confirm": "P_aoe_confirm.png",
     "P_battle_wait": "P_battle_wait.png",
+    "P_battle_escape": "P_battle_escape.png",
     "P_battle_enemylookingatu": "P_battle_enemylookingatu.png",
     "P_battle_enemygone": "P_battle_enemygone.png",
     "P_battle_letthemgo": "P_battle_letthemgo.png",
@@ -406,6 +408,8 @@ image_files = {
     "P_battle_death_main": "P_battle_death_main.png",
     "P_battle_death_npc1": "P_battle_death_npc1.png",
     "P_battle_death_npc2": "P_battle_death_npc2.png",
+    #怪物類
+    "P_Monster_Yeti": "P_Monster_Yeti.png",
     #異常狀態
     "P_poison": "P_poison.png",
     "P_poison2": "P_poison2.png",
@@ -481,11 +485,15 @@ image_files = {
     "P_ch4_B10F_checkpoint1": "P_ch4_B10F_checkpoint1.png",
     "P_ch4_B10F_checkpoint2": "P_ch4_B10F_checkpoint3.png",
     "P_ch4_B10F_checkpoint3": "P_ch4_B10F_checkpoint3.png",
+    "P_ch4_B10F_checkpoint4": "P_ch4_B10F_checkpoint4.png",
     "P_ch4_B10F_minimap1": "P_ch4_B10F_minimap1.png",
     "P_ch4_B10F_minimap2": "P_ch4_B10F_minimap2.png",
     "P_ch4_B10F_until1": "P_ch4_B10F_until1.png",
     "P_ch4_B10F_until2": "P_ch4_B10F_until2.png",
     "P_ch4_B10F_until3": "P_ch4_B10F_until3.png",
+    "P_ch4_B10F_until4_1": "P_ch4_B10F_until4_1.png",
+    "P_ch4_B10F_until4_2": "P_ch4_B10F_until4_2.png",
+    "P_ch4_B10F_SnowGlant": "P_ch4_B10F_SnowGlant.png",
     "P_ch4_on9npc1": "P_ch4_on9npc1.png",
     "P_ch4_on9npc2": "P_ch4_on9npc2.png",
     "P_ch4_on9npc2_2": "P_ch4_on9npc2_2.png",
