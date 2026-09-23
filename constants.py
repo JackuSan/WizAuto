@@ -8,10 +8,16 @@ ADB_HOST = "127.0.0.1"
 DEFAULT_IMAGE_DIR = "./images/"
 
 # 初始 list（複製用，勿直接 mutate）
+""" #20260923-logic update
 HANDLE_LOOP_LIST_START = [
     "P_chest_open", "P_fastbattle_active", "P_fastbattle_inactive", "P_exit", "P_battle_death_main",
     "P_battle_enemylookingatu", "P_dungeon_suspicious_trader", "P_dungeon_bone_trader",
     "P_gameicon2", "P_gameicon3"
+]
+"""
+HANDLE_LOOP_LIST_START = [
+    "P_chest_open", "P_fastbattle_active", "P_fastbattle_inactive", "P_exit", "P_battle_death_main",
+    "P_battle_enemylookingatu", "P_dungeon_suspicious_trader", "P_dungeon_bone_trader"
 ]
 DEBUFF_LIST_START = ["P_poison", "P_poison2", "P_curse", "P_rock"]
 P_AUTOBATTLE_ACTIVE_LIST = ["P_autobattle_active", "P_autobattle_active0", "P_autobattle_active1"]

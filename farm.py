@@ -2272,13 +2272,13 @@ def Farm_ch4B10F_SnowGlant():
         if check == "P_ch4_B10F_until4_1":
             press_key("w")
             wait_image("P_battle_wait")
-            if find_image("P_Monster_Yeti", fail_log=True):
+            if find_image("P_Monster_Yeti", similarity=0.75, fail_log=True):
                 for i in range(10):
                                     click_image("P_battle_escape")
                                     if wait_image(["P_battle_escape", "P_exit"]) == "P_exit":
                                         break
-            elif find_image("P_ch4_B10F_SnowGlant", similarity=0.85,fail_log=True):
-                battle_skill([(450, 850, "目標")])
+            elif find_image("P_ch4_B10F_SnowGlant", similarity=0.82,fail_log=True):
+                battle_skill([(450, 850, "雪巨人")])
             else:
                 for i in range(10):
                     click_image("P_battle_escape")
@@ -2307,7 +2307,7 @@ def test():
             while state.paused and not state.stop_event.is_set():
                 time.sleep(0.1)
         #在此輸入
-        find_image("P_ch4_B10F_SnowGlant", fail_log=True)
+        core.is_game_in_foreground()
         
         state.run_count += 1
     except StopIteration:

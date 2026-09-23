@@ -20,6 +20,18 @@ import state
 
 logger = logging.getLogger(__name__)
 
+# GUI函數
+def safe_gui_call(func, *args, **kwargs):
+    """安全地在主執行緒執行 GUI 相關操作"""
+    if state.app and state.app.root:
+        state.app.root.after(0, lambda: func(*args, **kwargs))
+    else:
+        # 如果 GUI 還沒準備好，就直接執行（或記錄）
+        try:
+            func(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"safe_gui_call 執行失敗: {e}")
+
 # 系統函數
 def is_player_running():    #檢查mumu是否運行
     """檢查 Mumuplayer 是否正在運行"""
@@ -112,7 +124,7 @@ def check_requirements():   #檢查圖片包
     # 檢查圖像資料夾
     if not os.path.exists(state.image_dir):
         logger.error(f"圖像資料夾 {state.image_dir} 不存在")
-        messagebox.showerror("錯誤", f"圖像資料夾 {state.image_dir} 不存在，請確保 images 資料夾與腳本或 exe 同級")
+        safe_gui_call(messagebox.showerror, "錯誤", f"圖像資料夾 {state.image_dir} 不存在，請確保 images 資料夾與腳本或 exe 同級")
         exit(1)
     # 檢查 platform-tools 文件夾和 adb.exe
     if getattr(sys, 'frozen', False):
@@ -122,11 +134,11 @@ def check_requirements():   #檢查圖片包
     adb_path = get_adb_path()
     if not os.path.exists(adb_dir):
         logger.error(f"platform-tools 資料夾 {adb_dir} 不存在")
-        messagebox.showerror("錯誤", f"platform-tools 資料夾 {adb_dir} 不存在，請確保 platform-tools 資料夾與腳本或 exe 同級")
+        safe_gui_call(messagebox.showerror, "錯誤", f"platform-tools 資料夾 {adb_dir} 不存在，請確保 platform-tools 資料夾與腳本或 exe 同級")
         exit(1)
     if not os.path.exists(adb_path):
         logger.error(f"ADB 可執行文件 {adb_path} 不存在")
-        messagebox.showerror("錯誤", f"ADB 可執行文件 {adb_path} 不存在，請確保 platform-tools 資料夾中包含 adb程式")
+        safe_gui_call(messagebox.showerror, "錯誤", f"ADB 可執行文件 {adb_path} 不存在，請確保 platform-tools 資料夾中包含 adb程式")
         exit(1)
 def connect_to_device():
     """
@@ -213,9 +225,9 @@ def get_adb_port(): #讀取adb port
                 state.adb_port = int(port)
                 dialog.destroy()
             else:
-                messagebox.showerror("錯誤", "請輸入有效的端口號 (1024-65535)")
+                safe_gui_call(messagebox.showerror, "錯誤", "請輸入有效的端口號 (1024-65535)")
         except Exception as e:
-            messagebox.showerror("錯誤", f"無效輸入: {e}")
+            safe_gui_call(messagebox.showerror, "錯誤", f"無效輸入: {e}")
 
     button = tk.Button(dialog, text="確認", command=submit)
     button.pack(pady=10)
@@ -249,6 +261,16 @@ def game_restart():
     timeout = 180          # 最多等 3 分鐘
 
     logger.info("開始 game_restart 流程")
+    logger.info("先等8秒")
+    time.sleep(8)
+    for i in range(3):
+        if connect_to_device():
+            logger.info("ADB 已恢復 online")
+            break
+        logger.warning(f"ADB 尚未 online，再等待... ({i+1}/3)")
+        time.sleep(3)
+    else:
+        logger.error("等待後 ADB 仍 offline")
 
     while time.time() - start_time < timeout:
         if state.stop_event.is_set():
@@ -409,6 +431,7 @@ def check_abnormality(sim=0.8):
             attempt += 1
         logger.error("多次嘗試後仍未解決斷線，終止處理")
         return True
+    """ #20260923-logic update
     gameicon_result = find_image(["P_gameicon2", "P_gameicon3"], screenshot=img, similarity=sim, log=False, remedial=False)
     if gameicon_result:
         image_name, (x, y), sim_val = gameicon_result
@@ -417,6 +440,12 @@ def check_abnormality(sim=0.8):
         start_game_app()
         game_restart()
         return True
+    """
+    if not is_game_in_foreground():
+        logger.info("遊戲不在前景，準備重新啟動")
+        force_stop_game()
+        start_game_app()
+        game_restart()
     backtotitle_result = find_image("P_backtotitle", screenshot=img, similarity=sim, log=False, remedial=False)
     if backtotitle_result:
         image_name, (x, y), sim_result = backtotitle_result
@@ -442,6 +471,8 @@ def run_adb_command(command):   #執行adb指令
     """執行 ADB 命令並返回輸出，指定設備端口"""
     adb_path = get_adb_path()
     full_command = f'"{adb_path}" -s {constants.ADB_HOST}:{state.adb_port} {command}'
+    is_force_stop = "force-stop" in command.lower()
+    
     for i in range(3):
         try:
             result = subprocess.run(full_command, shell=True, capture_output=True, text=True, check=True, timeout=5)
@@ -450,6 +481,32 @@ def run_adb_command(command):   #執行adb指令
             logger.warning(f"ADB 命令執行超時 (5秒): {command}，正在嘗試重試...")
             continue
         except subprocess.CalledProcessError as e:
+            error_msg = (e.stderr or "").lower()
+            # === 針對 force-stop 做特殊處理 ===
+            if is_force_stop:
+                logger.warning(f"force-stop 指令回傳錯誤（通常是遊戲本來就沒在運行）: {e.stderr.strip()}")
+                logger.warning("此錯誤可忽略，不觸發 ADB 恢復流程")
+                return ""
+            
+            # 特別處理 device not found / offline
+            if "not found" in error_msg or "offline" in error_msg:
+                logger.error(f"偵測到 ADB 裝置消失或 offline: {e.stderr.strip()}")
+                logger.warning("嘗試快速恢復 ADB...")
+                
+                # 快速恢復流程
+                adb_path = get_adb_path()
+                subprocess.run(f'"{adb_path}" kill-server', shell=True)
+                time.sleep(1)
+                subprocess.run(f'"{adb_path}" start-server', shell=True)
+                time.sleep(2)
+                
+                if connect_to_device():
+                    logger.info("ADB 已快速恢復")
+                    return None   # 讓上層重試這次指令
+                else:
+                    logger.error("快速恢復失敗，裝置可能已完全斷線")
+                    return None
+            
             logger.error(f"ADB 命令執行失敗: {e}")
             logger.error(f"命令輸出: {e.stderr.strip()}")
             
@@ -476,89 +533,97 @@ def run_adb_command(command):   #執行adb指令
                 logger.warning("模擬器進程仍在，但 ADB 無法連線，暫不重啟")
     else:
         return None
-def take_screenshot(name=None, region=None):    #截圖
-    """從設備捕獲螢幕截圖，改用純記憶體流方式，防止 Android 15 磁碟緩衝區爆滿"""
-    # 控頻：非存檔截圖時，強制小休 0.2 秒（每秒最多截圖 5 次，大幅減輕 CPU 負載）
-    if name is None:
-        time.sleep(0.2)
+def take_screenshot(name=None, region=None):
+    """從設備捕獲螢幕截圖，使用純記憶體流方式，並加強 device not found / offline 處理"""
+    #if name is None:
+    #    time.sleep(0.1)  # 控頻，避免截圖太頻繁
 
     adb_path = get_adb_path()
-    
-    # 定義 full_command，透過管道流直接讀取二進制數據 (-p 代表 png 格式)
     full_command = f'"{adb_path}" -s {constants.ADB_HOST}:{state.adb_port} shell screencap -p'
     
     max_attempts = 3
+    consecutive_fail = 0
+
     for attempt in range(1, max_attempts + 1):
         try:
-            result = subprocess.run(full_command,shell=True,capture_output=True,timeout=5)
+            result = subprocess.run(
+                full_command,
+                shell=True,
+                capture_output=True,
+                timeout=8
+            )
 
-            # 安全取得 stdout / stderr
-            stdout = result.stdout if result.stdout is not None else b""
-            stderr = result.stderr if result.stderr is not None else b""
+            if result.returncode != 0:
+                stderr = (result.stderr or b"").decode(errors="ignore").strip()
+                logger.warning(f"ADB 截圖失敗 (attempt {attempt}/{max_attempts})，returncode={result.returncode}，stderr={stderr}")
 
-            if result.returncode != 0 or not stdout:
-                logger.warning(
-                    f"ADB 截圖失敗 (attempt {attempt}/{max_attempts})，"
-                    f"returncode={result.returncode}，stderr={stderr.decode(errors='ignore').strip()}"
-                )
-                raise RuntimeError("ADB screencap failed")
+                # 特別處理 device not found / offline
+                if "not found" in stderr.lower() or "offline" in stderr.lower():
+                    logger.error("偵測到 device not found / offline，嘗試快速恢復 ADB")
+                    try:
+                        subprocess.run(f'"{adb_path}" kill-server', shell=True)
+                        time.sleep(1)
+                        subprocess.run(f'"{adb_path}" start-server', shell=True)
+                        time.sleep(2)
+                        connect_to_device()
+                    except Exception as recover_e:
+                        logger.warning(f"快速恢復 ADB 時發生錯誤: {recover_e}")
+                
+                consecutive_fail += 1
+                time.sleep(1)
+                continue
 
-            # Windows 需要把 \r\n 轉成 \n
-            if platform.system() == "Windows":
-                image_bytes = stdout.replace(b"\r\n", b"\n")
-            else:
-                image_bytes = stdout
+            # 成功取得資料
+            img_data = result.stdout
+            if not img_data:
+                logger.warning(f"ADB 截圖回傳空資料 (attempt {attempt})")
+                consecutive_fail += 1
+                time.sleep(0.5)
+                continue
 
-            nparr = np.frombuffer(image_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            # 修正 Windows ADB 會把 \n 變成 \r\n 的問題
+            img_data = img_data.replace(b'\r\n', b'\n')
+
+            # 轉成 OpenCV 格式
+            img_array = np.frombuffer(img_data, dtype=np.uint8)
+            img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
 
             if img is None:
-                logger.warning(f"無法解碼截圖資料 (attempt {attempt}/{max_attempts})")
-                raise RuntimeError("cv2.imdecode failed")
+                logger.warning(f"無法解碼截圖 (attempt {attempt})")
+                consecutive_fail += 1
+                time.sleep(0.5)
+                continue
 
-            # 成功取得圖像，跳出重試迴圈
-            break
+            # 成功取得圖片
+            if name:
+                save_path = os.path.join(state.image_dir, f"{name}.png")
+                cv2.imwrite(save_path, img)
+                logger.info(f"圖像已保存到: {save_path}")
 
+            return img
+
+        except subprocess.TimeoutExpired:
+            logger.warning(f"ADB 截圖超時 (attempt {attempt}/{max_attempts})")
+            consecutive_fail += 1
+            time.sleep(1)
         except Exception as e:
             logger.warning(f"ADB 截圖異常 (attempt {attempt}/{max_attempts}): {e}")
+            consecutive_fail += 1
+            time.sleep(1)
 
-            if attempt < max_attempts:
-                # 嘗試恢復 ADB
-                logger.info("嘗試恢復 ADB 服務...")
-                try:
-                    subprocess.run(f'"{adb_path}" kill-server', shell=True, timeout=5)
-                    time.sleep(1)
-                    subprocess.run(f'"{adb_path}" start-server', shell=True, timeout=5)
-                    time.sleep(2)
-                    connect_to_device()   # 重新連線
-                    time.sleep(1)
-                except Exception as recover_e:
-                    logger.warning(f"ADB 恢復過程發生錯誤: {recover_e}")
-            else:
-                # 最後一次仍失敗
-                logger.error("ADB 記憶體截圖失敗，可能 ADB 服務暫時離線")
-                return None
+    # 三次都失敗
+    logger.error("ADB 記憶體截圖失敗，可能 ADB 服務暫時離線")
 
-    # 走到這裡代表已成功取得 img
-    # 處理 region 裁切
-    if region is not None:
+    # 連續失敗後檢查遊戲是否還在前景
+    if consecutive_fail >= max_attempts:
+        logger.warning("截圖連續失敗，檢查遊戲是否仍在前景")
         try:
-            x, y, w, h = region
-            img = img[y:y+h, x:x+w]
+            if not is_game_in_foreground():
+                logger.info("遊戲已不在前景")
         except Exception as e:
-            logger.error(f"region 裁切失敗: {e}")
-            return None
+            logger.warning(f"檢查遊戲前景時發生錯誤: {e}")
 
-    # 若有指定 name，存檔
-    if name is not None:
-        try:
-            save_path = os.path.join(state.image_dir, f"{name}.png")
-            cv2.imwrite(save_path, img)
-            logger.info(f"圖像已保存到: {save_path}")
-        except Exception as e:
-            logger.error(f"存檔失敗 ({name}): {e}")
-
-    return img
+    return None
 def tap(x, y, name=None, log=True):  #點擊坐標
     """在設備上的指定坐標 (x, y) 模擬點擊"""
     run_adb_command(f"shell input tap {x} {y}")
@@ -578,27 +643,92 @@ def force_stop_game():
     return True
 def start_game_app():
     """用 ADB 直接啟動遊戲（取代點擊 gameicon），失敗時先嘗試恢復 ADB"""
-    logger.info(f"用 ADB 啟動遊戲: {constants.GAME_PACKAGE}")
-    
-    for attempt in range(3):
-        result = run_adb_command(f"shell monkey -p {constants.GAME_PACKAGE} -c android.intent.category.LAUNCHER 1")
+    package = constants.GAME_PACKAGE
+    logger.info(f"開始用 ADB 啟動遊戲")
+    logger.info(f"目標包名: {package}")
+    logger.info(f"目前 ADB 目標: {constants.ADB_HOST}:{state.adb_port}")
+
+    for attempt in range(1, 4):  # 1, 2, 3
+        logger.info(f"--- 第 {attempt} 次嘗試啟動遊戲 ---")
+        
+        command = f"shell monkey -p {package} -c android.intent.category.LAUNCHER 1"
+        logger.debug(f"執行指令: {command}")
+        
+        result = run_adb_command(command)
+        
         if result is not None:
+            logger.info(f"第 {attempt} 次啟動指令執行成功")
+            logger.debug(f"monkey 回傳內容: '{result}'")
             time.sleep(3)
+            
+            # 可選：再確認遊戲是否真的有起來（進階）
+            # check_result = run_adb_command(f"shell dumpsys window | findstr mCurrentFocus")
+            # logger.debug(f"目前前景 Activity: {check_result}")
+            
+            logger.info("遊戲啟動流程完成")
             return True
         
-        logger.warning(f"start_game_app 第 {attempt+1} 次失敗，嘗試恢復 ADB")
-        # 先嘗試救 ADB，而不是直接認定模擬器掛了
-        adb_path = get_adb_path()
+        logger.warning(f"第 {attempt} 次啟動失敗（run_adb_command 回傳 None）")
         
-        subprocess.run(f'"{adb_path}" kill-server', shell=True)
-        time.sleep(1)
-        subprocess.run(f'"{adb_path}" start-server', shell=True)
-        time.sleep(2)
-        connect_to_device()
-        time.sleep(2)
-    
-    logger.error("start_game_app 多次重試後仍然失敗")
+        if attempt < 3:
+            logger.warning("準備嘗試恢復 ADB 連線...")
+            adb_path = get_adb_path()
+            
+            logger.info("執行 adb kill-server")
+            subprocess.run(f'"{adb_path}" kill-server', shell=True)
+            time.sleep(1)
+            
+            logger.info("執行 adb start-server")
+            subprocess.run(f'"{adb_path}" start-server', shell=True)
+            time.sleep(2)
+            
+            logger.info("嘗試重新連線裝置...")
+            connected = connect_to_device()
+            
+            if connected:
+                logger.info("ADB 連線恢復成功，準備下一輪重試")
+            else:
+                logger.error("ADB 連線恢復失敗")
+            
+            time.sleep(2)
+        else:
+            logger.error("已達最大重試次數")
+
+    logger.error("start_game_app 最終失敗")
     return False
+def is_game_in_foreground():
+    """
+    用 ADB 檢查遊戲是否目前在最前面（前景）
+    同時支援 Windows 和 Mac
+    回傳 True  = 遊戲正在前景
+    回傳 False = 遊戲不在前景
+    """
+    package = constants.GAME_PACKAGE
+
+    # 根據作業系統選擇過濾指令
+    if platform.system() == 'Windows':
+        filter_cmd = "findstr mCurrentFocus"
+    else:
+        # Mac / Linux
+        filter_cmd = "grep mCurrentFocus"
+
+    command = f"shell dumpsys window | {filter_cmd}"
+    result = run_adb_command(command)
+
+    if result is None:
+        logger.warning("無法取得 mCurrentFocus 資訊（ADB 指令失敗）")
+        return False
+
+    # 有時候會回傳多行，統一轉成小寫方便判斷
+    result_lower = result.lower()
+    logger.debug(f"目前 mCurrentFocus: {result}")
+
+    if package.lower() in result_lower:
+        logger.debug("遊戲目前在前景")
+        return True
+    else:
+        logger.info(f"遊戲不在前景，目前焦點: {result.strip()}")
+        return False
 def freeze_screen_check(mode=1):
     """
     卡死畫面檢測
@@ -658,9 +788,9 @@ def freeze_screen_check(mode=1):
             # 下面直接走原本的重啟流程
             try:
                 force_stop_game()
-                time.sleep(2)
-                start_game_app()
                 time.sleep(5)
+                #20260923 start_game_app()
+                #20260923 time.sleep(5)
             except Exception as e:
                 logger.error(f"force-stop 失敗，改關模擬器: {e}")
                 if platform.system() == 'Windows':
@@ -679,7 +809,7 @@ def freeze_screen_check(mode=1):
     result = cv2.matchTemplate(image_current, image_previous, cv2.TM_CCOEFF_NORMED)
     _, max_val, _, _ = cv2.minMaxLoc(result)
 
-    val_threshold = 0.88
+    val_threshold = 0.95
     if max_val >= val_threshold:
         state.freeze_high_sim_count += 1
         logger.warning(f"疑似卡死畫面，連續高相似度次數: {state.freeze_high_sim_count}，當前相似度 {max_val:.4f}，門檻{val_threshold}")
@@ -693,8 +823,8 @@ def freeze_screen_check(mode=1):
             try:
                 force_stop_game()
                 time.sleep(2)
-                start_game_app()
-                time.sleep(5)
+                #20260923 start_game_app()
+                #20260923 time.sleep(5)
             except Exception as e:
                 logger.error(f"force-stop 失敗，改關模擬器: {e}")
                 if platform.system() == 'Windows':
@@ -707,7 +837,8 @@ def freeze_screen_check(mode=1):
             state.freeze_high_sim_count = 0
             return True
         else:
-            # 第一次疑似時，不要更新 freeze_screen_check_time
+            state.freeze_screen_check_time += 3
+            # 第一次疑似時，freeze_screen_check_time只加3秒
             # 讓它可以很快再檢查第二次，mode=2 也能正常累積
             return False
     else:
@@ -748,8 +879,8 @@ def find_image(image_list, screenshot=None, similarity=0.7, region=None, log=Tru
     if remedial:
         find_image_list.append("P_reconnect")
         find_image_list.append("P_backtotitle")
-        find_image_list.append("P_gameicon2")
-        find_image_list.append("P_gameicon3")
+        #20260923-logice update find_image_list.append("P_gameicon2")
+        #20260923-logice update find_image_list.append("P_gameicon3")
     # 裁剪區域（如果指定）
     if region:
         x, y, w, h = region
@@ -776,18 +907,20 @@ def find_image(image_list, screenshot=None, similarity=0.7, region=None, log=Tru
                     center_y += y
                 if log:
                     logger.info(f"在 ({center_x}, {center_y}) 找到 {image_name}，相似度 {max_val:.2f}")
+                """#20260923-logice update 
                 if image_name in ["P_gameicon2", "P_gameicon3"]:
-                    """20260831
-                    tap(center_x,center_y, "遊戲圖示")
-                    game_restart()
-                    continue
-                    """
                     logger.info(f"find_image 偵測到 {image_name}，改用 ADB 啟動遊戲")
                     force_stop_game()
                     start_game_app()
                     # 關鍵：傳入一個 flag 或直接呼叫，但要避免再觸發 remedial
                     game_restart()
                     return None          # 或 continue，但最好直接 return，讓外層重新開始
+                """
+                if not is_game_in_foreground():
+                    logger.info("遊戲不在前景，準備重新啟動")
+                    force_stop_game()
+                    start_game_app()
+                    game_restart()
                 elif image_name == "P_reconnect" and reconnect:
                     check_reconnect()
                 elif image_name == "P_backtotitle" and reconnect:
@@ -1220,7 +1353,7 @@ def revive_main():  #主角再起
     fire_count = findAll("P_battle_death_fire", similarity=0.75, region=(0, 0, 900, 800))
     logger.info(f"發現主角死亡，再起之火數量:{fire_count}")
     if  fire_count == 1:
-        messagebox.showinfo("提示", "再起之火只餘下一個")
+        safe_gui_call(messagebox.showerror, "提示", "再起之火只餘下一個")
         exit(0)
     else:
         click_image("P_battle_death_main", similarity=0.6)

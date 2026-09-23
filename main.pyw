@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 WizAuto 入口
-打包(windows): pyinstaller --noconfirm --onefile --windowed --add-data "platform-tools/windows;platform-tools" --name="WizAuto.v4.4.1" "main.pyw"
+打包(windows): pyinstaller --noconfirm --onefile --windowed --add-data "platform-tools/windows;platform-tools" --name="WizAuto.v4.4.2" "main.pyw"
 打包(mac): 
 """
 import os
@@ -30,17 +30,33 @@ if not os.path.exists(log_dir):
 log_filename = datetime.now().strftime("log_%Y%m%d%H%M%S.log")
 log_path = os.path.join(log_dir, log_filename)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s.%(msecs)03d] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[
-        logging.FileHandler(log_path, encoding='utf-8'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
+# 設定 root logger 為 DEBUG（最低等級，讓所有訊息都能被處理）
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
 
+# 清除原本可能存在的 handlers（避免重複）
+for handler in root_logger.handlers[:]:
+    root_logger.removeHandler(handler)
+
+# 格式
+formatter = logging.Formatter(
+    '[%(asctime)s.%(msecs)03d] %(levelname)s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# 1. 檔案 Handler（記錄全部等級）
+file_handler = logging.FileHandler(log_path, encoding='utf-8')
+file_handler.setLevel(logging.DEBUG)          # 全部都寫進檔案
+file_handler.setFormatter(formatter)
+root_logger.addHandler(file_handler)
+
+# 2. 終端機 Handler（只顯示 INFO 以上）
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+root_logger.addHandler(console_handler)
+
+logger = logging.getLogger(__name__)
 
 def preload_images():
     """檢查 images 目錄並預載模板"""

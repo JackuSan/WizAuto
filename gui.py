@@ -238,56 +238,6 @@ class AutomationGUI:
         )
         self.button_last.pack(side=tk.LEFT, padx=15)
 
-        """
-        # ====================== 日誌顯示 ======================
-        self.log_text = scrolledtext.ScrolledText(self.root, width=110, height=20, wrap=tk.WORD, state='disabled')
-        self.log_text.pack(pady=10, padx=10, fill="both", expand=True)
-        self.log_text.tag_config('warning', foreground='red')
-
-        text_handler = TextHandler(self.log_text)
-        text_handler.setFormatter(logging.Formatter('[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
-
-        # 重要：加到 root，不要只加到 gui logger
-        root_logger = logging.getLogger()
-        if not any(isinstance(h, TextHandler) for h in root_logger.handlers):
-            root_logger.addHandler(text_handler)
-
-        # ====================== 檢查與連接 ======================
-        core.check_requirements()
-        core.connect_to_device()
-        if not core.run_adb_command("devices"):
-            logger.error("未找到 ADB 設備。請確保設備已連接到 127.0.0.1:5555 並啟用 USB 調試或 TCP/IP 模式。")
-            logger.error("解決方法：")
-            logger.error("1. 運行 'adb connect 127.0.0.1:5555'")
-            logger.error("2. 檢查 'adb devices' 是否顯示 '127.0.0.1:5555 device'")
-            self.root.after(0, lambda: messagebox.showerror("錯誤", "未找到 ADB 設備，請檢查連接後重啟應用"))
-            self.root.destroy()
-            return
-        else:
-            logger.info("ADB連接passed")
-
-        # ====================== 日誌顯示 ======================
-        self.log_text = scrolledtext.ScrolledText(self.root, width=110, height=20, wrap=tk.WORD, state='disabled')
-        self.log_text.pack(pady=10, padx=10, fill="both", expand=True)  # 先 pack 日誌
-
-        text_handler = TextHandler(self.log_text)
-        text_handler.setFormatter(logging.Formatter('[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
-        logger.addHandler(text_handler)
-
-        # ====================== 彩蛋宣傳 ======================
-        self.social_frame = tk.Frame(root)
-        self.social_frame.pack(side=tk.BOTTOM, pady=5, fill=tk.X)  # 直接放最底
-
-        self.social_text = tk.Text(self.social_frame, height=2, font=(15), wrap="none")
-        self.social_text.pack()
-        hyperlink = HyperlinkManager(self.social_text)
-        self.social_text.insert(tk.END, "Youtube", hyperlink.add("https://www.youtube.com/channel/UCr4NlCWbXKPBOJCNzhgzRSQ"))
-        self.social_text.insert(tk.END, ": JackuSan遊戲之旅 | 每星期一三五晚上9-12點直播打機 | 歡迎來掛台聊天支持作者")
-        self.social_text.insert(tk.END, "\n")
-        self.social_text.insert(tk.END, "Discord", hyperlink.add("https://discord.gg/gsrCpdeEnT"))
-        self.social_text.insert(tk.END, ": 歡迎進來聊天和提出建議")
-        self.social_text.config(state="disabled")
-        """
         # ====================== 彩蛋宣傳（先 pack 到底部）======================
         self.social_frame = tk.Frame(self.root)
         self.social_frame.pack(side=tk.BOTTOM, pady=5, fill=tk.X)
@@ -313,6 +263,7 @@ class AutomationGUI:
         self.log_text.tag_config("warning", foreground="red")
 
         text_handler = TextHandler(self.log_text)
+        text_handler.setLevel(logging.INFO)          # GUI 只顯示 INFO 以上
         text_handler.setFormatter(
             logging.Formatter("[%(asctime)s.%(msecs)03d] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
         )
