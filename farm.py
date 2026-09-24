@@ -2268,7 +2268,7 @@ def Farm_ch4B10F_SnowGlant():
         goToMark("P_ch4_B10F_until4_1")
         heal()
         wait_image("P_exit")
-        press_key("w")
+        swipe(450, 800, 450, 500)
         wait_image("P_battle_wait")
         check = False
         while state.revived_bol == False and check == False:
