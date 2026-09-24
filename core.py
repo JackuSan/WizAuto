@@ -594,6 +594,14 @@ def take_screenshot(name=None, region=None):
                 time.sleep(0.5)
                 continue
 
+            # 裁剪指定範圍
+            if region:
+                x, y, w, h = region
+                img = img[y:y+h, x:x+w]
+                if img.size == 0:
+                    logger.error(f"裁剪後圖像為空，region={region}")
+                    return None
+
             # 成功取得圖片
             if name:
                 save_path = os.path.join(state.image_dir, f"{name}.png")
