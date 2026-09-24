@@ -1872,8 +1872,6 @@ def common_reaction(match, stage): #基本動作處理
     #再起(應該是中陷阱死了)
     elif match == "P_battle_death_main":
         revive_main()
-    elif match in ["P_battle_death_npc1", "P_battle_death_npc2"]:
-        revive_npc()
     #觸發敵人盯住你選項
     elif match == "P_battle_enemylookingatu":
         #還有個P_battle_fight選項是性格-1
@@ -2182,7 +2180,7 @@ def harken_check(target): #哈肯卡死檢測
     return True
 
 # 其他函數
-def press_key(key, duration=350):   #地城上下左右滑動
+def press_key(key, duration=450):   #地城上下左右滑動
     """模擬 ADB 滑動(wasd)或暫停(sleep)操作"""
     swipe_map = {
         'w': (450, 800, 450, 750),
