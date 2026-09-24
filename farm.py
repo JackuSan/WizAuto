@@ -2273,8 +2273,8 @@ def Farm_ch4B10F_SnowGlant():
             if find_image("P_Monster_Yeti", similarity=0.75, fail_log=True):
                 for i in range(10):
                     click_image("P_battle_escape", timeout=3)
-                    if find_image("P_exit"):
-                        break
+                if find_image("P_exit"):
+                    break
             elif find_image("P_ch4_B10F_SnowGlant", similarity=0.82,fail_log=True):
                 battle_skill([(450, 850, "雪巨人")])
                 if state.revived_bol:
@@ -2286,8 +2286,8 @@ def Farm_ch4B10F_SnowGlant():
             else:
                 for i in range(6):
                     click_image("P_battle_escape", timeout=3)
-                    if find_image("P_exit"):
-                        break
+                if find_image("P_exit"):
+                    break
         exitMap(["P_buff", "P_back"])
         core.harken_check("P_village")
         click_image("P_village")
