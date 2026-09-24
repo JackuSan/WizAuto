@@ -2267,6 +2267,7 @@ def Farm_ch4B10F_SnowGlant():
         wait_image("P_exit")
         goToMark("P_ch4_B10F_until4_1")
         heal()
+        wait_image("P_exit")
         press_key("w")
         wait_image("P_battle_wait")
         check = False
