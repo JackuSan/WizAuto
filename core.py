@@ -263,7 +263,7 @@ def game_restart():
     logger.info("開始 game_restart 流程")
     logger.info("先等8秒")
     time.sleep(8)
-    for i in range(3):
+    for i in range(5):
         if connect_to_device():
             logger.info("ADB 已恢復 online")
             break
@@ -778,19 +778,20 @@ def freeze_screen_check(mode=1):
     total_pixels = image_current.size
     dark_ratio = dark_pixels / total_pixels
     logger.info(f"目前畫面暗比例:{dark_ratio:.4%}")
+    
+    if dark_ratio >= 0.995 or dark_ratio == 0:
+        return False
 
+    """
     if dark_ratio >= 0.995 or dark_ratio == 0:
         state.freeze_high_sim_count += 1
         logger.warning(f"疑似黑畫面卡死，連續次數: {state.freeze_high_sim_count}，暗比例 {dark_ratio:.4%}")
 
         if state.freeze_high_sim_count >= 3:   # 連續 3 次黑畫面就確認卡死
             logger.info("確認黑畫面卡死，開始處理")
-            # 下面直接走原本的重啟流程
             try:
                 force_stop_game()
                 time.sleep(5)
-                #20260923 start_game_app()
-                #20260923 time.sleep(5)
             except Exception as e:
                 logger.error(f"force-stop 失敗，改關模擬器: {e}")
                 if platform.system() == 'Windows':
@@ -804,7 +805,8 @@ def freeze_screen_check(mode=1):
         else:
             # 還沒到 3 次，先不更新時間戳，讓它可以快速再檢查
             return False
-
+    """
+    
     # 比對
     result = cv2.matchTemplate(image_current, image_previous, cv2.TM_CCOEFF_NORMED)
     _, max_val, _, _ = cv2.minMaxLoc(result)
@@ -823,8 +825,6 @@ def freeze_screen_check(mode=1):
             try:
                 force_stop_game()
                 time.sleep(2)
-                #20260923 start_game_app()
-                #20260923 time.sleep(5)
             except Exception as e:
                 logger.error(f"force-stop 失敗，改關模擬器: {e}")
                 if platform.system() == 'Windows':
@@ -837,8 +837,8 @@ def freeze_screen_check(mode=1):
             state.freeze_high_sim_count = 0
             return True
         else:
-            state.freeze_screen_check_time += 3
-            # 第一次疑似時，freeze_screen_check_time只加3秒
+            state.freeze_screen_check_time += 5
+            # 第一次疑似時，freeze_screen_check_time只加5秒
             # 讓它可以很快再檢查第二次，mode=2 也能正常累積
             return False
     else:
@@ -1872,6 +1872,8 @@ def common_reaction(match, stage): #基本動作處理
     #再起(應該是中陷阱死了)
     elif match == "P_battle_death_main":
         revive_main()
+    elif match in ["P_battle_death_npc1", "P_battle_death_npc2"]:
+        revive_npc()
     #觸發敵人盯住你選項
     elif match == "P_battle_enemylookingatu":
         #還有個P_battle_fight選項是性格-1
@@ -2099,11 +2101,11 @@ def swipe_map(direction):   #小地圖滑動
                 start_x, start_y, end_x, end_y, duration = swipe_path[action]
                 swipe(start_x, start_y, end_x, end_y, duration)
     return True
-def goToMark(target=None, target_sim=0.6): #自動前往標記位置
+def goToMark(target=None, target_sim=0.6, marker=1): #自動前往標記位置
     def auto_mark():
         if not find_image("P_automark"):
             tap(761,342, "展開地圖功能")
-        if click_image("P_automark", timeout=3):
+        if click_image("P_Cmove", timeout=3):
             if wait_image("P_noPath", timeout=3, fail_count=False):
                 logger.info("出現「無法找到路徑」情況")
                 return False
@@ -2111,13 +2113,14 @@ def goToMark(target=None, target_sim=0.6): #自動前往標記位置
     # (state) global state.target_until
     if target:
         state.target_until = target if isinstance(target,list) else [target]
-    try_time = 1
+    checkpoint = marker
     match = None
-    for i in range(try_time):
-        logger.info(f"goToMark第{try_time}外圈, try_time:{try_time}")
+    for goal in range(checkpoint):
+        logger.info(f"正在前往第{goal+1}個標記, 標記總數:{checkpoint}")
+        click_image("P_automark", timeout=3)
         for i in range(20):
             logger.info(f"goToMark第{i}內圈")
-            if target is not None and try_time>0:
+            if target is not None and checkpoint>0:
                 if find_image(target, similarity=target_sim, fail_log=True):
                     logger.info(f"到達{target}，auto_mark完結")
                     return True
@@ -2129,13 +2132,13 @@ def goToMark(target=None, target_sim=0.6): #自動前往標記位置
                     if auto_mark():
                         waitVanish("P_exit", timeout=5)
                     else:
-                        logger.info("auto_mark完結")
-                        return True
+                        logger.info(f"到達第{goal+1}個標記")
+                        break
             else:
                 common_reaction(match, None)  # state.stage=None，因為此處不依賴 state.stage
         time.sleep(0.5)
     else:
-        logger.info(f"已觸發{try_time}次前往標記，提早完結")
+        logger.info(f"已到達第{checkpoint}標記, goToMark完成")
         return True
 def ch2_pre():
     # (state) global state.run_count, state.on9npc_list, state.handle_loop_list

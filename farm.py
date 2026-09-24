@@ -1180,8 +1180,7 @@ def Farm_ch4B4F():
         click_image("P_ch4_B4F")
         goToDungeon_check()
         wait_image("P_exit")
-        goToMark("P_ch4_B4F_minimap1")
-        goToMark("P_ch4_B4F_minimap6")
+        goToMark("P_ch4_B4F_minimap6", marker=2)
         exitMap(["P_back", "P_buff"])
         harken_check("P_ch4_outside")
         wait_image("P_ch4_outside")
@@ -2266,22 +2265,27 @@ def Farm_ch4B10F_SnowGlant():
         click_image("P_ch4_B10F")
         goToDungeon_check()
         wait_image("P_exit")
-        #check = goMap("P_ch4_B10F_checkpoint4", ["P_ch4_B10F_until4_1", "P_ch4_B10F_until4_2"], goMap_similarity=0.8)
-        check = goMap("P_ch4_B10F_checkpoint4", ["P_ch4_B10F_until4_1"], goMap_similarity=0.7)
+        goToMark("P_ch4_B10F_until4_1")
         heal()
-        if check == "P_ch4_B10F_until4_1":
-            press_key("w")
-            wait_image("P_battle_wait")
+        press_key("w")
+        wait_image("P_battle_wait")
+        while state.revived_bol == False:
             if find_image("P_Monster_Yeti", similarity=0.75, fail_log=True):
                 for i in range(10):
-                                    click_image("P_battle_escape")
-                                    if wait_image(["P_battle_escape", "P_exit"]) == "P_exit":
-                                        break
+                    click_image("P_battle_escape", timeout=3)
+                    if wait_image(["P_battle_escape", "P_exit"]) == "P_exit":
+                        break
             elif find_image("P_ch4_B10F_SnowGlant", similarity=0.82,fail_log=True):
                 battle_skill([(450, 850, "雪巨人")])
+                if state.revived_bol:
+                    wait_image("P_exit")
+                    press_key("w")
+                    state.revived_bol = False
+                else:
+                    break
             else:
-                for i in range(10):
-                    click_image("P_battle_escape")
+                for i in range(6):
+                    click_image("P_battle_escape", timeout=3)
                     if wait_image(["P_battle_escape", "P_exit"]) == "P_exit":
                         break
         exitMap(["P_buff", "P_back"])
