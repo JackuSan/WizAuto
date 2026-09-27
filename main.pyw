@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 WizAuto 入口
-打包(windows): pyinstaller --noconfirm --onefile --windowed --add-data "platform-tools/windows;platform-tools" --name="WizAuto.v4.4.2" "main.pyw"
+打包(windows): pyinstaller --noconfirm --onefile --windowed --add-data "platform-tools/windows;platform-tools" --name="WizAuto.v4.4.3" "main.pyw"
 打包(mac): 
 """
 import os

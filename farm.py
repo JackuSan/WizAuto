@@ -2270,7 +2270,6 @@ def Farm_ch4B10F_SnowGlant():
         wait_image("P_exit")
         swipe(450, 800, 450, 500)
         wait_image("P_battle_wait")
-        check = False
         while state.revived_bol == False:
             if find_image(["P_ch4_B10F_SnowGlant", "P_ch4_B10F_SnowGlant2"], similarity=0.82,fail_log=True):
                 battle_skill([(450, 850, "雪巨人")], mode=2)
@@ -2308,6 +2307,7 @@ def test():
             while state.paused and not state.stop_event.is_set():
                 time.sleep(0.1)
         #在此輸入
+        take_screenshot("test", region=(33,56,167,69))
         
         state.run_count += 1
     except StopIteration:

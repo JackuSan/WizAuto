@@ -790,7 +790,7 @@ def freeze_screen_check(mode=1):
     if dark_ratio >= 0.995 or dark_ratio == 0:
         return False
 
-    """
+    """ 暫時取消
     if dark_ratio >= 0.995 or dark_ratio == 0:
         state.freeze_high_sim_count += 1
         logger.warning(f"疑似黑畫面卡死，連續次數: {state.freeze_high_sim_count}，暗比例 {dark_ratio:.4%}")
@@ -1168,7 +1168,7 @@ def waitVanish(image_list, similarity=0.7, region=None, timeout=120):   #等待�
 def waitBattleVanish(similarity=0.7, region=None, timeout=120):   #等待戰鬥消失
     """等待某一圖像消失"""
     logger.info(f"waitBattleVanish開始, 相似度要求{similarity}, 範圍{region}, 最長時限{timeout}秒")
-    image_list = ["P_fastbattle_active", "P_fastbattle_inactive"] 
+    image_list = ["P_fastbattle_active", "P_fastbattle_inactive", "P_battle_detail"] 
     match = find_image(image_list, similarity=similarity, region=region, log=False)
     if match:
         logger.info(f"找到{image_list}，等待{image_list}消失")
@@ -1536,14 +1536,14 @@ def battle_skill(enemy_list=None, mode=1): #技能戰鬥
     }
 
     for i in range(100):
-        match = wait_image(["P_battle_bar", "P_chest_open", "P_exit", "P_battle_death_main", "P_battle_death_npc1", "P_battle_death_npc2", 
-                            "P_fastbattle_inactive"], 
-                           similarity=0.8)
-        if match == "P_battle_bar":
+        match = wait_image(["P_battle_bar", "P_chest_open", "P_exit", "P_fastbattle_inactive", "P_battle_enemylookingatu", "P_battle_detail"], 
+                           similarity=0.8, timeout=3)
+        if match in ["P_battle_bar", "P_battle_detail"]:
             time.sleep(0.5)
 
             # ===== 決定要使用的技能 =====
             skill_num = 4   # 預設 mode1 用 4 號
+            player_turn = take_screenshot(region=(33,56,167,69))
 
             if mode == 2:
                 slot, _ = get_active_character()
@@ -1583,7 +1583,10 @@ def battle_skill(enemy_list=None, mode=1): #技能戰鬥
             if validated_enemies is None:
                 for j in range(3):
                     for k in range(1, 11):
-                        if find_image(["P_battle_detail", "P_battle_baseattack"], log=False):
+                        player_now = take_screenshot(region=(33,56,167,69))
+                        result = cv2.matchTemplate(player_now, player_turn, cv2.TM_CCOEFF_NORMED)
+                        _, max_val, _, _ = cv2.minMaxLoc(result)
+                        if max_val >= 0.9:
                             tap(k * 75, 800 - j * 50, log=False)
                         else:
                             break
@@ -1601,13 +1604,14 @@ def battle_skill(enemy_list=None, mode=1): #技能戰鬥
         elif match == "P_exit":
             if image_stability("P_exit", max_attempts=1):
                 break
-        elif match == "P_battle_death_main":
-            revive_main()
-            wait_image("P_exit")
-            #time.sleep(1)
-            #press_key("w")
-        elif match in ["P_battle_death_npc1", "P_battle_death_npc2"]:
-            revive_npc()
+        if not find_image(["P_fastbattle_inactive", "P_fastbattle_active", "P_battle_detail"]):
+            if find_image("P_battle_death_main"):
+                revive_main()
+                wait_image("P_exit")
+                #time.sleep(1)
+                #press_key("w")
+            if find_image(["P_battle_death_npc1"]): #P_battle_death_npc2會誤判...
+                revive_npc()
     state.skill_indices = [0, 0, 0, 0, 0, 0]
     return True
 
