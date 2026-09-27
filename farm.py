@@ -2265,33 +2265,26 @@ def Farm_ch4B10F_SnowGlant():
         click_image("P_ch4_B10F")
         goToDungeon_check()
         wait_image("P_exit")
-        goToMark("P_ch4_B10F_until4_1")
+        goToMark()
         heal()
         wait_image("P_exit")
         swipe(450, 800, 450, 500)
         wait_image("P_battle_wait")
         check = False
-        while state.revived_bol == False and check == False:
-            if find_image("P_Monster_Yeti", similarity=0.75, fail_log=True):
-                for i in range(10):
-                    click_image("P_battle_escape", timeout=3)
-                    if find_image("P_exit"):
-                        check = True
-                        break
-            elif find_image("P_ch4_B10F_SnowGlant", similarity=0.82,fail_log=True):
-                battle_skill([(450, 850, "雪巨人")])
-                if state.revived_bol:
-                    wait_image("P_exit")
-                    press_key("w")
-                    state.revived_bol = False
-                else:
-                    break
+        while state.revived_bol == False:
+            if find_image(["P_ch4_B10F_SnowGlant", "P_ch4_B10F_SnowGlant2"], similarity=0.82,fail_log=True):
+                battle_skill([(450, 850, "雪巨人")], mode=2)
             else:
-                for i in range(10):
-                    click_image("P_battle_escape", timeout=3)
-                    if find_image("P_exit"):
-                        check = True
-                        break
+                battle_skill(mode=2)
+            if state.revived_bol:
+                logger.info("再起了, 繼續再打")
+                wait_image("P_exit")
+                swipe(450, 800, 450, 500)
+                state.revived_bol = False
+                wait_image("P_battle_wait")
+            else:
+                logger.info("戰鬥結束, 回家")
+                break
         exitMap(["P_buff", "P_back"])
         core.harken_check("P_village")
         click_image("P_village")
@@ -2315,7 +2308,6 @@ def test():
             while state.paused and not state.stop_event.is_set():
                 time.sleep(0.1)
         #在此輸入
-        core.is_game_in_foreground()
         
         state.run_count += 1
     except StopIteration:

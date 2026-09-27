@@ -400,7 +400,7 @@ def check_backtotitle(screenshot=None, similarity=0.8):
     game_restart()
     return True
 def check_abnormality(sim=0.8):
-    logger.info("斷線檢查")
+    #logger.info("斷線檢查")
     img = take_screenshot()          # 只截一次
     reconnect_result = find_image("P_reconnect", screenshot=img, similarity=sim, log=False, remedial=False)
     if reconnect_result:
@@ -1220,6 +1220,59 @@ def image_stability(image, similarity=0.7, max_attempts=1, delay=0.1):  #檢查�
         time.sleep(delay)
     logger.info(f"{image} 連續檢查通過，確認穩定出現")
     return True
+def get_active_character(screenshot=None, min_gold=800):
+    """
+    偵測下方角色欄目前有黃光高亮的行動角色
+    回傳: (slot, gold_count)  或  (None, 0)
+    
+    slot 定義:
+        1 = 上排左, 2 = 上排中, 3 = 上排右
+        4 = 下排左, 5 = 下排中, 6 = 下排右
+    """
+    if screenshot is None:
+        screenshot = take_screenshot()
+    if screenshot is None:
+        logger.error("get_active_character: 截圖失敗")
+        return None, 0
+
+    # 六個角色卡片完整區域（900x1600 實測）
+    CHAR_REGIONS = [
+        (20, 1255, 290, 1400),   # 1 上排左
+        (310, 1255, 580, 1400),  # 2 上排中
+        (600, 1255, 880, 1400),  # 3 上排右
+        (20, 1435, 290, 1580),   # 4 下排左
+        (310, 1435, 580, 1580),  # 5 下排中
+        (600, 1435, 880, 1580),  # 6 下排右
+    ]
+
+    max_gold = 0
+    active_slot = None
+
+    for i, (x1, y1, x2, y2) in enumerate(CHAR_REGIONS):
+        crop = screenshot[y1:y2, x1:x2]
+        if crop.size == 0:
+            continue
+
+        # OpenCV 是 BGR 格式
+        gold_mask = (
+            (crop[:, :, 2] > 200) &   # R
+            (crop[:, :, 1] > 170) &   # G
+            (crop[:, :, 0] < 180)     # B
+        )
+        gold_count = int(np.sum(gold_mask))
+
+        logger.debug(f"角色格 {i+1} 金色像素: {gold_count}")
+
+        if gold_count > max_gold:
+            max_gold = gold_count
+            active_slot = i + 1
+
+    if active_slot is None or max_gold < min_gold:
+        logger.warning(f"get_active_character: 未偵測到明確高亮角色（最高金色像素={max_gold}）")
+        return None, max_gold
+
+    logger.info(f"目前行動角色: 第 {active_slot} 格（金色像素分數: {max_gold}）")
+    return active_slot, max_gold
 
 # 補給函數
 def inn_rest(): #旅館休息
@@ -1438,14 +1491,15 @@ def reteam():   #隊伍企位檢查
             logger.warning(f"{box} 未找到任何角色圖像")
     logger.info("角色重新排列完成")
     tap(constants.L_reteam[0], constants.L_reteam[1], "隊伍整理")
-def battle_skill(enemy_list=None): #技能戰鬥
+def battle_skill(enemy_list=None, mode=1): #技能戰鬥
     """
+    mode=1 : 原本行為，固定使用右下 4 號技能
+    mode=2 : 依照 state.skill_orders 使用 0-4 號技能（0=普攻）
+             會先用 get_active_character() 判斷目前行動角色，再取對應順序
+
     enemy_list 支援格式：
         None                          → 使用原本的網格點擊
         [(x, y), (x, y, "備註"), ...] → 依序點擊指定座標
-    範例：
-        battle_skill([(100, 200, "女妖"), (300, 400, "巨人")])
-        battle_skill([(450, 850)])                 # 只有座標也可以
     """
     # ---------- 1. 資料驗證與正規化 ----------
     validated_enemies = None
@@ -1471,47 +1525,90 @@ def battle_skill(enemy_list=None): #技能戰鬥
             validated_enemies.append((int(x), int(y), str(note)))
 
         logger.info(f"技能戰鬥目標敵人: {validated_enemies}")
-    
+
+    # 技能按鈕座標（根據截圖）
+    # 1=左上, 2=右上, 3=左下, 4=右下
+    SKILL_POS = {
+        1: (270, 970),   # 左上
+        2: (600, 970),   # 右上
+        3: (270, 1060),   # 左下
+        4: (600, 1060),   # 右下（沿用原本座標）
+    }
+
     for i in range(100):
-            match = wait_image(["P_battle_bar", "P_chest_open", "P_exit", "P_battle_death_main", "P_battle_death_npc1", "P_battle_death_npc2", 
-                                "P_fastbattle_inactive"], 
-                               similarity=0.8)
-            if match == "P_battle_bar":
-                time.sleep(0.5)
-                tap(553,1103, "右下技能")
+        match = wait_image(["P_battle_bar", "P_chest_open", "P_exit", "P_battle_death_main", "P_battle_death_npc1", "P_battle_death_npc2", 
+                            "P_fastbattle_inactive"], 
+                           similarity=0.8)
+        if match == "P_battle_bar":
+            time.sleep(0.5)
+
+            # ===== 決定要使用的技能 =====
+            skill_num = 4   # 預設 mode1 用 4 號
+
+            if mode == 2:
+                slot, _ = get_active_character()
+                if slot is None:
+                    logger.warning("mode2 無法判斷行動角色，改用 4 號技能")
+                    skill_num = 4
+                else:
+                    order_str = state.skill_orders[slot - 1] if slot - 1 < len(state.skill_orders) else ""
+                    if not order_str:
+                        logger.info(f"角色 {slot} 沒有設定技能順序，改用普攻 (0)")
+                        skill_num = 0
+                    else:
+                        idx = state.skill_indices[slot - 1] % len(order_str)
+                        skill_num = int(order_str[idx])
+                        # 前進指標
+                        state.skill_indices[slot - 1] = (idx + 1) % len(order_str)
+                        logger.info(f"角色 {slot} 使用技能順序第 {idx+1} 個 → 技能 {skill_num}（完整順序: {order_str}）")
+
+            # ===== 點擊技能（0 = 普攻，不點技能）=====
+            if skill_num in (1, 2, 3, 4):
+                x, y = SKILL_POS[skill_num]
+                tap(x, y, f"{skill_num}號技能")
+                # 保留原本防呆機制
                 if click_image("P_aoe_confirm", timeout=1.5, fail_count=False):
                     if find_image("P_battle_noSPMP"):
                         click_image("P_battle_noSPMP")
                         click_image("P_battle_baseattack")
-                if find_image("P_battle_detail", region=(0,0,900,1000)):
-                    tap(453,1196,"2號角色")
-                if validated_enemies is None:
-                    for j in range (3):
-                        for i in range(1,11):
-                            if find_image(["P_battle_detail","P_battle_baseattack"], log=False):
-                                tap(i*75, 800-j*50, log=False)
-                            else:
-                                break
+            else:
+                # skill_num == 0 → 普攻，直接點敵人
+                logger.info("使用普攻（技能 0）")
+
+            # 原本的 detail 處理保留
+            if find_image("P_battle_detail", region=(0, 0, 900, 1000)):
+                tap(453, 1196, "2號角色")
+
+            # ===== 點擊敵人 =====
+            if validated_enemies is None:
+                for j in range(3):
+                    for k in range(1, 11):
+                        if find_image(["P_battle_detail", "P_battle_baseattack"], log=False):
+                            tap(k * 75, 800 - j * 50, log=False)
                         else:
-                            tap(899, 800 - j * 50, log=False)
-                else:
-                    for x, y, note in validated_enemies:
-                        tap(x, y, note)
-                        time.sleep(0.15)
-            elif match == "P_fastbattle_inactive":
-                click_image("P_fastbattle_inactive")
-            elif match == "P_chest_open":
-                    open_chest()
-            elif match == "P_exit":
-                if image_stability("P_exit", max_attempts=1):
-                    break
-            elif match == "P_battle_death_main":
-                revive_main()
-                wait_image("P_exit")
-                time.sleep(1)
-                press_key("w")
-            elif match in ["P_battle_death_npc1", "P_battle_death_npc2"]:
-                revive_npc()
+                            break
+                    else:
+                        tap(899, 800 - j * 50, log=False)
+            else:
+                for x, y, note in validated_enemies:
+                    tap(x, y, note)
+                    time.sleep(0.15)
+
+        elif match == "P_fastbattle_inactive":
+            click_image("P_fastbattle_inactive")
+        elif match == "P_chest_open":
+            open_chest()
+        elif match == "P_exit":
+            if image_stability("P_exit", max_attempts=1):
+                break
+        elif match == "P_battle_death_main":
+            revive_main()
+            wait_image("P_exit")
+            #time.sleep(1)
+            #press_key("w")
+        elif match in ["P_battle_death_npc1", "P_battle_death_npc2"]:
+            revive_npc()
+    state.skill_indices = [0, 0, 0, 0, 0, 0]
     return True
 
 # 寶箱函數
@@ -2117,8 +2214,14 @@ def goToMark(target=None, target_sim=0.6, marker=1): #自動前往標記位置
                 return False
         return True
     # (state) global state.target_until
+    state.images_list = state.handle_loop_list[:]
     if target:
-        state.target_until = target if isinstance(target,list) else [target]
+        state.target_until = target
+        if isinstance(target, list):
+            for item in range(len(target)):
+                state.images_list.insert(item, target[item])
+        else:
+            state.images_list.insert(0, target)
     checkpoint = marker
     match = None
     for goal in range(checkpoint):
@@ -2129,8 +2232,9 @@ def goToMark(target=None, target_sim=0.6, marker=1): #自動前往標記位置
             if target is not None and checkpoint>0:
                 if find_image(target, similarity=target_sim, fail_log=True):
                     logger.info(f"到達{target}，auto_mark完結")
+                    state.target_until = None
                     return True
-            match = wait_image(state.handle_loop_list)
+            match = wait_image(state.images_list)
             logger.info(f"找到匹配: {match}")
             if match == "P_exit":
                 if image_stability("P_exit", max_attempts=1):
@@ -2145,6 +2249,7 @@ def goToMark(target=None, target_sim=0.6, marker=1): #自動前往標記位置
         time.sleep(0.5)
     else:
         logger.info(f"已到達第{checkpoint}標記, goToMark完成")
+        state.target_until = None
         return True
 def ch2_pre():
     # (state) global state.run_count, state.on9npc_list, state.handle_loop_list

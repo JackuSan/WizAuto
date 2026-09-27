@@ -3,7 +3,7 @@
 import os
 
 GAME_PACKAGE = "jp.co.drecom.wizardry.daphne"
-VERSION = "4.4.2"
+VERSION = "4.4.3"
 ADB_HOST = "127.0.0.1"
 DEFAULT_IMAGE_DIR = "./images/"
 
@@ -57,7 +57,7 @@ script_remainder = {
                                 "旅館" : ["不休息", "野外補給", "標準房", "豪華房"],
                                 "異常狀態": "凍僵, 詛咒",
                                 "提示": ["1. 請在B10F的指定位置加標記", "2. 請對指定樹使用逆轉右手", "3. 請打開「總是取消自動戰鬥」",
-                                       "4. 建議帶治療師解凍僵", "5. 會出不同的垃圾裝備, 小心爆背包"]},
+                                       "4. 建議帶治療師解凍僵", "5. 會出不同的垃圾裝備, 小心爆背包", "6.巨人戰鬥會啟用技能戰鬥順序"]},
             "擊退敵方勢力(固定開技版)": {"起點": "第二章郊外", 
                               "旅館" : ["地城露營", "標準房", "豪華房"],
                               "異常狀態": "無", 
@@ -493,6 +493,7 @@ image_files = {
     "P_ch4_B10F_until4_1": "P_ch4_B10F_until4_1.png",
     "P_ch4_B10F_until4_2": "P_ch4_B10F_until4_2.png",
     "P_ch4_B10F_SnowGlant": "P_ch4_B10F_SnowGlant.png",
+    "P_ch4_B10F_SnowGlant2": "P_ch4_B10F_SnowGlant2.png",
     "P_ch4_on9npc1": "P_ch4_on9npc1.png",
     "P_ch4_on9npc2": "P_ch4_on9npc2.png",
     "P_ch4_on9npc2_2": "P_ch4_on9npc2_2.png",

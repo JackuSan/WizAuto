@@ -48,6 +48,8 @@ personality_action = None
 personality_score = None
 personality_choice = None
 script_choice = None
+skill_orders = ["", "", "", "", "", ""]  # 1~6號角色的技能使用順序（字串，內容為1-4）
+skill_indices = [0, 0, 0, 0, 0, 0]      # 每個角色目前要用到第幾個技能
 
 target_checkpoint = None
 image_restart = None

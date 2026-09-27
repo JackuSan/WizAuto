@@ -65,7 +65,7 @@ class AutomationGUI:
         state.app = self  # 將當前實例賦值給 state.app
         self.root = root
         self.root.title(f"Jacku小精靈-Wizardry Variants Daphne Automation v{constants.VERSION} [ADB port:{state.adb_port}]")
-        self.root.geometry("900x600")
+        self.root.geometry("900x640")
         self.root.resizable(False, False)
         self.is_running = False
         self.target_count = 0
@@ -216,6 +216,20 @@ class AutomationGUI:
         self.battle_combobox.grid(row=3, column=5, sticky="w", padx=2, pady=3)
         self.battle_combobox.bind("<<ComboboxSelected>>", self.validate_battle)
 
+        # ====================== 技能順序輸入區 ======================
+        self.skill_frame = tk.Frame(root)
+        self.skill_frame.pack(pady=4, padx=10, anchor="w", fill="x")
+
+        tk.Label(self.skill_frame, text="技能順序(0-4):").pack(side=tk.LEFT, padx=(0, 6))
+
+        self.entry_skills = []
+        for i in range(6):
+            tk.Label(self.skill_frame, text=f"{i+1}號").pack(side=tk.LEFT, padx=(4, 1))
+            entry = tk.Entry(self.skill_frame, width=8)
+            entry.pack(side=tk.LEFT, padx=(0, 6))
+            entry.bind("<KeyRelease>", self.validate_skill_order)
+            self.entry_skills.append(entry)
+
         # ====================== 按鈕區 ======================
         self.button_frame = tk.Frame(root)
         self.button_frame.pack(pady=1)
@@ -310,6 +324,7 @@ class AutomationGUI:
             "freeze_var": self.freeze_var.get(),
             "battle_choice": self.battle_choice.get(),
             "entry_chest_char": self.entry_chest_char.get(),
+            "skill_orders": [entry.get() for entry in self.entry_skills],
         }
         with open("config.json", "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
@@ -339,6 +354,10 @@ class AutomationGUI:
                     if "entry_chest_char" in data: 
                         self.entry_chest_char.delete(0, tk.END)
                         self.entry_chest_char.insert(0, data["entry_chest_char"])
+                    if "skill_orders" in data and isinstance(data["skill_orders"], list):
+                        for i, val in enumerate(data["skill_orders"][:6]):
+                            self.entry_skills[i].delete(0, tk.END)
+                            self.entry_skills[i].insert(0, val)
                         
                     self.validate_target(None)
             except Exception as e:
@@ -376,6 +395,27 @@ class AutomationGUI:
             return False
         self.entry_chest_char.config(bg="white")
         return True
+    def validate_skill_order(self, event):
+        """驗證技能順序：只允許數字 0-4，長度不限，可重覆，可空白"""
+        widget = event.widget if event else None
+        if widget is None:
+            # 全部檢查
+            all_valid = True
+            for entry in self.entry_skills:
+                value = entry.get().strip()
+                if value and not all(c in "1234" for c in value):
+                    entry.config(bg="pink")
+                    all_valid = False
+                else:
+                    entry.config(bg="white")
+            return all_valid
+        else:
+            value = widget.get().strip()
+            if value and not all(c in "01234" for c in value):
+                widget.config(bg="pink")
+                return False
+            widget.config(bg="white")
+            return True
     def validate_target(self, event):   #驗證次數
         """驗證目標次數輸入"""
         try:
@@ -416,6 +456,8 @@ class AutomationGUI:
         self.button_resume.config(state="normal")
         self.entry_healperiod.config(state="normal")
         self.entry_chest_char.config(state="normal")
+        for entry in self.entry_skills:
+            entry.config(state="normal")
         self.trap_combobox.config(state="readonly")
         self.button_run.config(state="disabled")
         self.button_stop.config(state="normal")
@@ -426,6 +468,9 @@ class AutomationGUI:
         # (state) global state.paused, state.trap_mode, state.heal_period
         if not self.validate_chest_char(None):
             messagebox.showerror("錯誤", "開箱角色順序無效，請輸入6位不重覆的1-6數字")
+            return
+        if not self.validate_skill_order(None):
+            messagebox.showerror("錯誤", "技能順序無效，只能輸入數字0-4（可重覆、可空白）")
             return
         trap_map = {
             "放棄解除陷阱箱": 1,
@@ -442,6 +487,8 @@ class AutomationGUI:
         self.button_resume.config(state="disabled")
         self.entry_healperiod.config(state="disabled")
         self.entry_chest_char.config(state="disabled")
+        for entry in self.entry_skills:
+            entry.config(state="disabled")
         self.trap_combobox.config(state="disabled")
         self.button_run.config(state="disabled")
         self.button_stop.config(state="normal")
@@ -466,6 +513,8 @@ class AutomationGUI:
                 self.entry_target.config(state="normal")
                 self.entry_healperiod.config(state="normal")
                 self.entry_chest_char.config(state="normal")
+                for entry in self.entry_skills:
+                    entry.config(state="normal")
                 self.check_revive.config(state="normal")
                 self.battle_combobox.config(state="readonly")
                 self.check_freeze.config(state="normal")
@@ -493,6 +542,9 @@ class AutomationGUI:
             return
         if not self.validate_chest_char(None):
             messagebox.showerror("錯誤", "開箱角色順序無效，請輸入6位不重覆的1-6數字")
+            return
+        if not self.validate_skill_order(None):
+            messagebox.showerror("錯誤", "技能順序無效，只能輸入數字0-4（可重覆、可空白）")
             return
         trap_map = {
             "放棄解除陷阱箱": 1,
@@ -525,6 +577,7 @@ class AutomationGUI:
         state.battle_mode = self.battle_choice.get()
         state.freeze_check_status = self.freeze_var.get()
         state.chest_char = int(self.entry_chest_char.get())
+        state.skill_orders = [entry.get().strip() for entry in self.entry_skills]
         state.is_running = True
         state.stop_event.clear()
         state.last_round = False
@@ -536,6 +589,8 @@ class AutomationGUI:
         self.entry_target.config(state="disabled")
         self.entry_healperiod.config(state="disabled")
         self.entry_chest_char.config(state="disabled")
+        for entry in self.entry_skills:
+            entry.config(state="disabled")
         self.check_revive.config(state="disabled") #禁止更改再起checkbox選擇
         self.battle_combobox.config(state="disabled")
         self.check_freeze.config(state="disabled") #禁止更改卡死畫面checkbox選擇
