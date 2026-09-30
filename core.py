@@ -1534,10 +1534,16 @@ def battle_skill(enemy_list=None, mode=1): #技能戰鬥
         3: (270, 1060),   # 左下
         4: (600, 1060),   # 右下（沿用原本座標）
     }
-
+    image_list = ["P_battle_bar", "P_chest_open", "P_exit", "P_fastbattle_inactive", "P_battle_enemylookingatu", "P_battle_detail"]
+    if state.target_until:
+        if isinstance(state.target_until, list):
+                for item in range(len(state.target_until)):
+                    image_list.insert(item, state.target_until[item])
+        else:
+            image_list.insert(0, state.target_until)
+    
     for i in range(100):
-        match = wait_image(["P_battle_bar", "P_chest_open", "P_exit", "P_fastbattle_inactive", "P_battle_enemylookingatu", "P_battle_detail"], 
-                           similarity=0.8, timeout=3)
+        match = wait_image(image_list, similarity=0.8, timeout=3)
         if match in ["P_battle_bar", "P_battle_detail"]:
             time.sleep(0.5)
 
@@ -1582,16 +1588,17 @@ def battle_skill(enemy_list=None, mode=1): #技能戰鬥
             # ===== 點擊敵人 =====
             if validated_enemies is None:
                 for j in range(3):
-                    for k in range(1, 11):
+                    for k in range(1, 13):
                         player_now = take_screenshot(region=(33,56,167,69))
                         result = cv2.matchTemplate(player_now, player_turn, cv2.TM_CCOEFF_NORMED)
                         _, max_val, _, _ = cv2.minMaxLoc(result)
-                        if max_val >= 0.9:
-                            tap(k * 75, 800 - j * 50, log=False)
+                        if max_val >= 0.9 and find_image(["P_battle_baseattack", "P_battle_detail"], log=False):
+                            if i == 12:
+                                tap(899, 800 - j * 50, log=False)
+                            else:
+                                tap(k * 75, 800 - j * 50, log=False)
                         else:
                             break
-                    else:
-                        tap(899, 800 - j * 50, log=False)
             else:
                 for x, y, note in validated_enemies:
                     tap(x, y, note)
@@ -1600,7 +1607,10 @@ def battle_skill(enemy_list=None, mode=1): #技能戰鬥
         elif match == "P_fastbattle_inactive":
             click_image("P_fastbattle_inactive")
         elif match == "P_chest_open":
-            open_chest()
+            break
+        elif state.target_until:
+            if match in state.target_until:
+                break
         elif match == "P_exit":
             if image_stability("P_exit", max_attempts=1):
                 break
@@ -1866,7 +1876,7 @@ def trap3():    #測速拆陷阱模式 #未完成
 
 # 跑圖函數
 def comment_check():
-    if find_image("P_comment1"):
+    if find_image("P_comment1", log=False):
         click_image("P_comment2")
         click_image("P_comment3")
         return True

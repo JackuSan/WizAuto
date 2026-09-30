@@ -2268,7 +2268,8 @@ def Farm_ch4B10F_SnowGlant():
         goToMark()
         heal()
         wait_image("P_exit")
-        swipe(450, 800, 450, 500)
+        #swipe(450, 800, 450, 500)
+        press_key(["a", "w"])
         wait_image("P_battle_wait")
         while state.revived_bol == False:
             if find_image(["P_ch4_B10F_SnowGlant", "P_ch4_B10F_SnowGlant2"], similarity=0.82,fail_log=True):
@@ -2284,6 +2285,10 @@ def Farm_ch4B10F_SnowGlant():
             else:
                 logger.info("戰鬥結束, 回家")
                 break
+        if wait_image(["P_chest_open", "P_exit"]) == "P_chest_open":
+            open_chest()
+        time.sleep(2)
+        press_key("s")
         exitMap(["P_buff", "P_back"])
         core.harken_check("P_village")
         click_image("P_village")

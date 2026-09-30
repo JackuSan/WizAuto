@@ -403,7 +403,7 @@ class AutomationGUI:
             all_valid = True
             for entry in self.entry_skills:
                 value = entry.get().strip()
-                if value and not all(c in "1234" for c in value):
+                if value and not all(c in "01234" for c in value):
                     entry.config(bg="pink")
                     all_valid = False
                 else:
