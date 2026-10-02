@@ -2299,6 +2299,53 @@ def Farm_ch4B10F_SnowGlant():
     except StopIteration:
         logger.info("主循環被中斷，腳本終止")
         raise
+def Farm_FF11_B4F():
+    """FF11_B4F周回雜物"""
+    # (state) global state.run_count, state.paused, state.trap_char_all_scared, state.inn_mode
+    try:
+        if state.stop_event.is_set():
+            logger.info("收到停止指令，終止FF11_B4F周回雜物")
+            raise StopIteration
+        if state.paused:
+            logger.info("腳本已暫停，等待繼續")
+            while state.paused and not state.stop_event.is_set():
+                time.sleep(0.1)
+        if not find_image("P_FF11_B3F"):
+            exitLog("起點不正確, 請移到看到FF11_B3F的位置") 
+        if state.inn_mode == 2:
+            exitLog("此腳本不能使用「地城露營」休息模式")
+        click_image("P_FF11_B3F")    
+        goToDungeon_check()
+        wait_image("P_exit")
+        goToMark("P_FF11_B4F_minimap1")
+        find_chest_process(map=["P_Farm_FF11_B4F_chestarea1", "P_Farm_FF11_B4F_chestarea2"], direction = None, forbidden_mode=False)
+        exitMap(["P_back", "P_buff"])
+        harken_check("P_FF11_B3F")
+        wait_image("P_FF11_B3F")
+        if (state.run_count+1)%state.heal_period == 0:
+            if state.inn_mode == 3 or state.inn_mode == 4:
+                click_image("P_worldMap")
+                wait_image("P_FF11Cave")
+                tap(constants.L_map_scalesmall[0], constants.L_map_scalesmall[1], "縮小地圖")
+                time.sleep(1.5)
+                click_image("P_chapter1")
+                inn_check()
+                general_inn_mode(mode=2)
+                map_click()
+                time.sleep(1)
+                if not find_image("P_FF11Cave"):
+                    tap(constants.L_map_scalebig[0], constants.L_map_scalebig[1], "放大地圖")
+                    time.sleep(2)
+                    swipe(450,600,450,1000,500)
+                click_image("P_FF11Cave")
+                time.sleep(1)
+            elif state.inn_mode == 1 or state.inn_mode == 0:
+                general_inn_mode(mode=1)
+        wait_image("P_FF11_B2F")
+        state.run_count += 1
+    except StopIteration:
+        logger.info("主循環被中斷，腳本終止")
+        raise
 
 
 def test():
@@ -2312,7 +2359,6 @@ def test():
             while state.paused and not state.stop_event.is_set():
                 time.sleep(0.1)
         #在此輸入
-        take_screenshot("test", region=(33,56,167,69))
         
         state.run_count += 1
     except StopIteration:

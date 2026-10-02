@@ -132,7 +132,8 @@ class AutomationGUI:
                                                     #"金礦石任務(第三章)",
                                                     "旅館不停休息", 
                                                     "FF11_B1F周回雜物",
-                                                    "FF11_B2F周回雜物", 
+                                                    "FF11_B2F周回雜物",
+                                                    "FF11_B4F周回雜物", 
                                                     "FF11_B5F周回雜物", 
                                                     "FF11_B5F周回標記",
                                                     "FF11_B2F周回挖礦",
@@ -158,7 +159,7 @@ class AutomationGUI:
         tk.Label(self.table_frame, text="開箱模式:").grid(row=1, column=0, sticky="w", padx=2, pady=3)
         self.trap_choice = tk.StringVar()
         self.trap_combobox = ttk.Combobox(self.table_frame, textvariable=self.trap_choice,
-                                        values=["放棄解除陷阱箱", "隨機解除陷阱箱", "測速解除陷阱箱(未完成不要選)"],
+                                        values=["放棄解除陷阱箱", "隨機解除陷阱箱", "測速解除陷阱箱"],
                                         state="readonly", width=COMBO_WIDTH)
         self.trap_combobox.set("隨機解除陷阱箱")
         self.trap_combobox.grid(row=1, column=1, sticky="w", padx=2, pady=3)
@@ -611,7 +612,7 @@ class AutomationGUI:
             state.minimap_list = state.freeze_screen_check_time = None
             state.on9npc_list = []
             state.debuff_list = constants.DEBUFF_LIST_START[:]
-            state.run_count = state.chest_count = state.equip_count = state.personality_count = 0
+            state.run_count = state.chest_count = state.equip_count = state.personality_count = state.trap3_count = state.trap_fail_count = 0
             state.list_update_status = state.first_freeze_screen_check = True
             state.revived_bol = False
             state.last_round = False
@@ -705,6 +706,8 @@ class AutomationGUI:
                     farm.Farm_FF11_B5F()
                 elif self.script_choice.get() == "FF11_B5F周回標記":
                     farm.Farm_FF11_B5F_fixed()
+                elif self.script_choice.get() == "FF11_B4F周回雜物":
+                    farm.Farm_FF11_B4F()
                 elif self.script_choice.get() == "FF11_B2F周回雜物":
                     farm.Farm_FF11_B2F()
                 elif self.script_choice.get() == "FF11_B1F周回雜物":

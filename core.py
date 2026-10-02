@@ -1224,10 +1224,8 @@ def get_active_character(screenshot=None, min_gold=800):
     """
     偵測下方角色欄目前有黃光高亮的行動角色
     回傳: (slot, gold_count)  或  (None, 0)
-    
-    slot 定義:
-        1 = 上排左, 2 = 上排中, 3 = 上排右
-        4 = 下排左, 5 = 下排中, 6 = 下排右
+
+    slot: 1上左 2上中 3上右 4下左 5下中 6下右
     """
     if screenshot is None:
         screenshot = take_screenshot()
@@ -1235,43 +1233,84 @@ def get_active_character(screenshot=None, min_gold=800):
         logger.error("get_active_character: 截圖失敗")
         return None, 0
 
-    # 六個角色卡片完整區域（900x1600 實測）
     CHAR_REGIONS = [
-        (20, 1255, 290, 1400),   # 1 上排左
-        (310, 1255, 580, 1400),  # 2 上排中
-        (600, 1255, 880, 1400),  # 3 上排右
-        (20, 1435, 290, 1580),   # 4 下排左
-        (310, 1435, 580, 1580),  # 5 下排中
-        (600, 1435, 880, 1580),  # 6 下排右
+        (20, 1255, 290, 1400),
+        (310, 1255, 580, 1400),
+        (600, 1255, 880, 1400),
+        (20, 1435, 290, 1580),
+        (310, 1435, 580, 1580),
+        (600, 1435, 880, 1580),
     ]
 
-    max_gold = 0
-    active_slot = None
+    def count_gold(crop, strict=True):
+        # OpenCV BGR
+        if strict:
+            mask = (
+                (crop[:, :, 2] > 200) &
+                (crop[:, :, 1] > 170) &
+                (crop[:, :, 0] < 180)
+            )
+        else:
+            # 殘血壓暗時的寬鬆條件
+            mask = (
+                (crop[:, :, 2] > 120) &
+                (crop[:, :, 1] > 80) &
+                (crop[:, :, 0] < 160)
+            )
+        return int(np.sum(mask))
 
+    # ----- 第一階段：嚴格 -----
+    scores = []
     for i, (x1, y1, x2, y2) in enumerate(CHAR_REGIONS):
         crop = screenshot[y1:y2, x1:x2]
         if crop.size == 0:
+            scores.append(0)
             continue
+        g = count_gold(crop, strict=True)
+        scores.append(g)
+        logger.debug(f"角色格 {i+1} 金色像素(嚴格): {g}")
 
-        # OpenCV 是 BGR 格式
-        gold_mask = (
-            (crop[:, :, 2] > 200) &   # R
-            (crop[:, :, 1] > 170) &   # G
-            (crop[:, :, 0] < 180)     # B
+    max_gold = max(scores) if scores else 0
+    active_slot = scores.index(max_gold) + 1 if scores else None
+
+    if active_slot is not None and max_gold >= min_gold:
+        logger.info(f"目前行動角色: 第 {active_slot} 格（金色像素分數: {max_gold}）")
+        return active_slot, max_gold
+
+    # ----- 第二階段：寬鬆（殘血／壓暗）-----
+    logger.debug(f"嚴格模式最高僅 {max_gold}，改用寬鬆高亮判定")
+    scores_loose = []
+    for i, (x1, y1, x2, y2) in enumerate(CHAR_REGIONS):
+        crop = screenshot[y1:y2, x1:x2]
+        if crop.size == 0:
+            scores_loose.append(0)
+            continue
+        g = count_gold(crop, strict=False)
+        scores_loose.append(g)
+        logger.debug(f"角色格 {i+1} 金色像素(寬鬆): {g}")
+
+    if not scores_loose or max(scores_loose) == 0:
+        logger.warning("get_active_character: 嚴格/寬鬆皆未偵測到高亮角色")
+        return None, 0
+
+    sorted_scores = sorted(scores_loose, reverse=True)
+    max_gold = sorted_scores[0]
+    second = sorted_scores[1] if len(sorted_scores) > 1 else 0
+    active_slot = scores_loose.index(max_gold) + 1
+
+    # 必須明顯高於第二名，避免全暗時亂選
+    # 殘血實測約 4 倍；正常若誤入此分支通常也會有明顯差距
+    if max_gold < 1500 or (second > 0 and max_gold < second * 1.8):
+        logger.warning(
+            f"get_active_character: 寬鬆模式仍無法確認 "
+            f"(最高={max_gold}, 次高={second})"
         )
-        gold_count = int(np.sum(gold_mask))
-
-        logger.debug(f"角色格 {i+1} 金色像素: {gold_count}")
-
-        if gold_count > max_gold:
-            max_gold = gold_count
-            active_slot = i + 1
-
-    if active_slot is None or max_gold < min_gold:
-        logger.warning(f"get_active_character: 未偵測到明確高亮角色（最高金色像素={max_gold}）")
         return None, max_gold
 
-    logger.info(f"目前行動角色: 第 {active_slot} 格（金色像素分數: {max_gold}）")
+    logger.info(
+        f"目前行動角色: 第 {active_slot} 格"
+        f"（寬鬆模式 金色={max_gold}, 次高={second}）"
+    )
     return active_slot, max_gold
 
 # 補給函數
@@ -1281,6 +1320,7 @@ def inn_rest(): #旅館休息
     if (state.run_count+1)%state.heal_period == 0:
         logger.info(f"目前次數{state.run_count+1}次，補給間隔{state.heal_period}次，滿足條件進行補給")
         click_image("P_inn")
+        time.sleep(1.5)
         click_image("P_inn_rest")
         if state.inn_mode == 3:
             click_image("P_inn_standardroom")
@@ -1289,16 +1329,10 @@ def inn_rest(): #旅館休息
         click_image("P_inn_rest_confirm", similarity=0.8)
         click_image("P_inn_rest_dialog1")   
         time.sleep(1)  
-        check = click_image(["P_inn_rest_bagrefill", "P_inn_rest_dialog2", "P_inn_rest_dialog3"], similarity=0.68)
-        if check == "P_inn_rest_bagrefill":
-            click_image(["P_inn_rest_dialog2", "P_inn_rest_dialog3"])
         for i in range(50):
-            check = wait_image(["P_inn_leave","P_inn_levelup_skill","P_inn_levelup_close", "P_inn_levelup_next"])
-            if check == "P_inn_leave":
+            if click_image(["P_inn_rest_bagrefill", "P_inn_rest_dialog2", "P_inn_rest_dialog3","P_inn_leave","P_inn_levelup_skill",
+                                "P_inn_levelup_close", "P_inn_levelup_next"], similarity=0.67) == "P_inn_leave":
                 break
-            elif check in ["P_inn_levelup_skill","P_inn_levelup_close", "P_inn_levelup_next"]:
-                click_image(["P_inn_levelup_skill","P_inn_levelup_close", "P_inn_levelup_next"], timeout=3)
-        click_image("P_inn_leave")
     else:
         logger.info(f"目前次數{state.run_count}次，補給間隔{state.heal_period}次，不用補給")
 def bag(sim=0.7, outside=True):  #補充背包
@@ -1871,8 +1905,142 @@ def trap2():    #隨機拆陷阱模式
         if find_image(["P_chest_gain", "P_chest_scary", "P_chest_ar"], similarity=0.7):
             logger.info("[P_chest_gain, P_chest_scary, P_chest_ar]出現，結束循環")
             break
-def trap3():    #測速拆陷阱模式 #未完成
-    pass
+def trap3():
+    """測速拆陷阱：白條進入黃色區域中段時點擊解除（最多嘗試 5 次）"""
+    logger.info("發現陷阱，state.trap_mode = 3（測速）")
+    state.trap_count += 1
+    # 進度條區域（使用者確認：y46-126，x 全寬 900）
+    BAR_Y1, BAR_Y2 = 46, 126
+    BAR_X1, BAR_X2 = 0, 900
+    CLICK_POS = constants.L_trap_remove  # (450, 1000)
+
+    # 中段判定：只取黃區中間比例（避開左右邊緣的時間差）
+    MID_RATIO = 0.35          # 中段佔黃區寬度的比例（0.35 = 中間 35%）
+    MIN_ZONE_WIDTH = 40       # 黃區太窄則忽略
+    MAX_CLICKS = 5            # 最多嘗試點擊次數
+
+    start = time.time()
+    timeout = 60
+    click_cooldown = 0.0
+    success_imgs = ["P_chest_gain", "P_chest_scary", "P_chest_ar"]
+    click_count = 0
+
+    while time.time() - start < timeout:
+        if state.stop_event.is_set():
+            logger.info("trap3 收到停止指令")
+            return False
+
+        # 已出現結果畫面 → 成功結束
+        result = find_image(success_imgs, similarity=0.7, log=False)
+        if result:
+            if result == "P_chest_ar":
+                state.trap_fail_count += 1
+            logger.info(f"陷阱解除成功，共點擊 {click_count} 次")
+            logger.info(f"統計trap3模式遇上陷阱{state.trap_count}次，失敗次數{state.trap_fail_count}次")
+            return True
+
+        # 已達最大點擊次數
+        if click_count >= MAX_CLICKS:
+            logger.warning(f"trap3 已達最大點擊次數 {MAX_CLICKS}，停止嘗試")
+            break
+
+        img = take_screenshot()
+        if img is None:
+            time.sleep(0.02)
+            continue
+
+        # OpenCV BGR
+        bar = img[BAR_Y1:BAR_Y2, BAR_X1:BAR_X2]
+        if bar.size == 0:
+            logger.debug("trap3: 進度條裁切為空，跳過")
+            time.sleep(0.02)
+            continue
+
+        b = bar[:, :, 0].astype(int)
+        g = bar[:, :, 1].astype(int)
+        r = bar[:, :, 2].astype(int)
+
+        # 黃色成功區
+        is_yellow = (r > 180) & (g > 100) & (g < 230) & (b < 120)
+        # 白條
+        is_white = (r > 210) & (g > 210) & (b > 210)
+
+        # --- 找出黃色區間 ---
+        col_yellow = is_yellow.sum(axis=0) > 8
+        zones = []
+        in_zone = False
+        z_start = 0
+        for i, v in enumerate(col_yellow):
+            if v and not in_zone:
+                z_start = i
+                in_zone = True
+            elif not v and in_zone:
+                if i - z_start >= MIN_ZONE_WIDTH:
+                    zones.append((z_start, i))
+                in_zone = False
+        if in_zone and len(col_yellow) - z_start >= MIN_ZONE_WIDTH:
+            zones.append((z_start, len(col_yellow)))
+
+        # --- 白條 x（螢幕絕對座標，BAR_X1=0）---
+        white_cols = np.where(is_white.sum(axis=0) > 2)[0]
+        if len(white_cols) == 0:
+            logger.debug(f"trap3: 未偵測到白條 | zones={zones}")
+            time.sleep(0.02)
+            continue
+        if len(zones) == 0:
+            logger.debug(f"trap3: 未偵測到黃區 | white_x={int(np.median(white_cols))}")
+            time.sleep(0.02)
+            continue
+
+        white_x = int(np.median(white_cols))
+
+        # --- 只取每個黃區的中段 ---
+        mid_zones = []
+        for z0, z1 in zones:
+            width = z1 - z0
+            if width < MIN_ZONE_WIDTH:
+                continue
+            mid_half = width * MID_RATIO / 2.0
+            center = (z0 + z1) / 2.0
+            m0 = int(center - mid_half)
+            m1 = int(center + mid_half)
+            mid_zones.append((m0, m1))
+
+        in_mid = any(m0 <= white_x <= m1 for m0, m1 in mid_zones)
+
+        logger.debug(
+            f"trap3: white_x={white_x} | zones={zones} | mid_zones={mid_zones} | "
+            f"in_mid={in_mid} | clicks={click_count}/{MAX_CLICKS}"
+        )
+
+        now = time.time()
+        if in_mid and now >= click_cooldown:
+            logger.info(
+                f"白條 x={white_x} 落入黃區中段 {mid_zones}，點擊解除 "
+                f"(elapsed={now - start:.1f}s, click#{click_count + 1}/{MAX_CLICKS})"
+            )
+            tap(CLICK_POS[0], CLICK_POS[1], "解除陷阱")
+            click_count += 1
+            click_cooldown = now + 0.35
+            time.sleep(0.15)
+
+            result = find_image(success_imgs, similarity=0.7, log=False)
+            if result:
+                if result == "P_chest_ar":
+                    state.trap_fail_count += 1
+                logger.info(f"陷阱解除成功，共點擊 {click_count} 次")
+                logger.info(f"統計trap3模式遇上陷阱{state.trap_count}次，失敗次數{state.trap_fail_count}次")
+                return True
+        else:
+            time.sleep(0.02)
+
+    # 超時或達最大次數後的收尾
+    if click_count >= MAX_CLICKS:
+        logger.warning(f"trap3 已點滿 {MAX_CLICKS} 次仍未成功")
+    else:
+        logger.warning(f"trap3 超時({timeout}s)，共點擊 {click_count} 次")
+
+    return True
 
 # 跑圖函數
 def comment_check():
@@ -2228,14 +2396,16 @@ def goToMark(target=None, target_sim=0.6, marker=1): #自動前往標記位置
                 return False
         return True
     # (state) global state.target_until
-    state.images_list = state.handle_loop_list[:]
+    images_list = state.handle_loop_list[:]
+    images_list.append("P_buff")
+    images_list.append("P_back")
     if target:
         state.target_until = target
         if isinstance(target, list):
             for item in range(len(target)):
-                state.images_list.insert(item, target[item])
+                images_list.insert(item, target[item])
         else:
-            state.images_list.insert(0, target)
+            images_list.insert(0, target)
     checkpoint = marker
     match = None
     for goal in range(checkpoint):
@@ -2248,7 +2418,7 @@ def goToMark(target=None, target_sim=0.6, marker=1): #自動前往標記位置
                     logger.info(f"到達{target}，auto_mark完結")
                     state.target_until = None
                     return True
-            match = wait_image(state.images_list)
+            match = wait_image(images_list)
             logger.info(f"找到匹配: {match}")
             if match == "P_exit":
                 if image_stability("P_exit", max_attempts=1):
@@ -2258,6 +2428,9 @@ def goToMark(target=None, target_sim=0.6, marker=1): #自動前往標記位置
                     else:
                         logger.info(f"到達第{goal+1}個標記")
                         break
+            elif match in ["P_back", "P_buff"]:
+                logger.info(f"意外到達哈肯，提早終止")
+                break
             else:
                 common_reaction(match, None)  # state.stage=None，因為此處不依賴 state.stage
         time.sleep(0.5)

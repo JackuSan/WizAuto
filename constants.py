@@ -3,7 +3,7 @@
 import os
 
 GAME_PACKAGE = "jp.co.drecom.wizardry.daphne"
-VERSION = "4.4.3"
+VERSION = "4.5.1"
 ADB_HOST = "127.0.0.1"
 DEFAULT_IMAGE_DIR = "./images/"
 
@@ -154,6 +154,10 @@ script_remainder = {
                                      "旅館" : ["不休息", "野外補給", "標準房", "豪華房"],
                                      "異常狀態": "無",
                          "提示": ["1. 在B5F找個心儀位置標記"]},
+            "FF11_B4F周回雜物": {"起點": "FF11活動圖郊外", 
+                                     "旅館" : ["不休息", "野外補給", "標準房", "豪華房"],
+                                     "異常狀態": "無",
+                         "提示": ["1. 在B3F去B4F的樓梯加標記"]},
             "FF11_B2F周回雜物": {"起點": "FF11活動圖郊外", 
                          "旅館" : ["不休息", "野外補給", "標準房", "豪華房"],
                          "異常狀態": "無"},
@@ -726,8 +730,12 @@ image_files = {
     #FF11活動
     "P_FF11_B1F": "P_FF11_B1F.png",
     "P_FF11_B2F": "P_FF11_B2F.png",
+    "P_FF11_B3F": "P_FF11_B3F.png",
     "P_FF11_B5F": "P_FF11_B5F.png",
     "P_FF11Cave": "P_FF11Cave.png",
+    "P_Farm_FF11_B4F_chestarea1": "P_Farm_FF11_B4F_chestarea1.png",
+    "P_Farm_FF11_B4F_chestarea2": "P_Farm_FF11_B4F_chestarea2.png",
+    "P_FF11_B4F_minimap1": "P_FF11_B4F_minimap1.png",
     "P_FF11_B5F_minimap1": "P_FF11_B5F_minimap1.png",
     "P_FF11_get": "P_FF11_get.png",
     "P_FF11_ore": "P_FF11_ore.png",
