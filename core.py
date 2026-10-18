@@ -887,8 +887,6 @@ def find_image(image_list, screenshot=None, similarity=0.7, region=None, log=Tru
     if remedial:
         find_image_list.append("P_reconnect")
         find_image_list.append("P_backtotitle")
-        #20260923-logice update find_image_list.append("P_gameicon2")
-        #20260923-logice update find_image_list.append("P_gameicon3")
     # 裁剪區域（如果指定）
     if region:
         x, y, w, h = region
@@ -915,15 +913,6 @@ def find_image(image_list, screenshot=None, similarity=0.7, region=None, log=Tru
                     center_y += y
                 if log:
                     logger.info(f"在 ({center_x}, {center_y}) 找到 {image_name}，相似度 {max_val:.2f}")
-                """#20260923-logice update 
-                if image_name in ["P_gameicon2", "P_gameicon3"]:
-                    logger.info(f"find_image 偵測到 {image_name}，改用 ADB 啟動遊戲")
-                    force_stop_game()
-                    start_game_app()
-                    # 關鍵：傳入一個 flag 或直接呼叫，但要避免再觸發 remedial
-                    game_restart()
-                    return None          # 或 continue，但最好直接 return，讓外層重新開始
-                """
                 if not is_game_in_foreground():
                     logger.info("遊戲不在前景，準備重新啟動")
                     force_stop_game()
@@ -937,9 +926,11 @@ def find_image(image_list, screenshot=None, similarity=0.7, region=None, log=Tru
                     state.image_fail_count = 0
                     return (image_name, (center_x, center_y), round(max_val,2))
             else:
-                if fail_log:
-                    if not image_name in ["P_reconnect", "P_gameicon2", "P_gameicon3", "P_backtotitle"]:
+                if not image_name in ["P_reconnect", "P_gameicon2", "P_gameicon3", "P_backtotitle"]:
+                    if fail_log:
                         logger.info(f"沒有找到 {image_name}，最高相似度 {max_val:.2f}")
+                    else:
+                        logger.debug(f"沒有找到 {image_name}，最高相似度 {max_val:.2f}")
                 if max_val > state.failed_image_sim:
                     state.failed_image_sim = max_val
         except Exception as e:
@@ -1188,8 +1179,9 @@ def waitBattleVanish(similarity=0.7, region=None, timeout=120):   #等待戰鬥�
                 match_count += 1
             loop_count += 1
             if loop_count == 10:
-                if find_image(constants.P_AUTOBATTLE_INACTIVE_LIST, log=False):
-                    click_image(constants.P_AUTOBATTLE_INACTIVE_LIST)
+                if state.battle_mode == "自動戰鬥":
+                    if find_image(constants.P_AUTOBATTLE_INACTIVE_LIST, log=False):
+                        click_image(constants.P_AUTOBATTLE_INACTIVE_LIST)
                 loop_count = 0
                 check_reconnect()
         else:
@@ -1330,8 +1322,10 @@ def inn_rest(): #旅館休息
         click_image("P_inn_rest_dialog1")   
         time.sleep(1)  
         for i in range(50):
-            if click_image(["P_inn_rest_bagrefill", "P_inn_rest_dialog2", "P_inn_rest_dialog3","P_inn_leave","P_inn_levelup_skill",
-                                "P_inn_levelup_close", "P_inn_levelup_next"], similarity=0.67) == "P_inn_leave":
+            temp = click_image(["P_inn_rest_bagrefill", "P_inn_rest_dialog2", "P_inn_rest_dialog3","P_inn_leave","P_inn_levelup_skill",
+                                "P_inn_levelup_close", "P_inn_levelup_next"], similarity=0.67)
+            time.sleep(1)
+            if temp == "P_inn_leave":
                 break
     else:
         logger.info(f"目前次數{state.run_count}次，補給間隔{state.heal_period}次，不用補給")
@@ -1576,6 +1570,8 @@ def battle_skill(enemy_list=None, mode=1): #技能戰鬥
         else:
             image_list.insert(0, state.target_until)
     
+    temp = 0
+    n = len(constants.L_battle_skill_co)
     for i in range(100):
         match = wait_image(image_list, similarity=0.8, timeout=3)
         if match in ["P_battle_bar", "P_battle_detail"]:
@@ -1618,21 +1614,22 @@ def battle_skill(enemy_list=None, mode=1): #技能戰鬥
             # 原本的 detail 處理保留
             if find_image("P_battle_detail", region=(0, 0, 900, 1000)):
                 tap(453, 1196, "2號角色")
-
+            
             # ===== 點擊敵人 =====
+            start = temp
             if validated_enemies is None:
-                for j in range(3):
-                    for k in range(1, 13):
-                        player_now = take_screenshot(region=(33,56,167,69))
-                        result = cv2.matchTemplate(player_now, player_turn, cv2.TM_CCOEFF_NORMED)
-                        _, max_val, _, _ = cv2.minMaxLoc(result)
-                        if max_val >= 0.9 and find_image(["P_battle_baseattack", "P_battle_detail"], log=False):
-                            if i == 12:
-                                tap(899, 800 - j * 50, log=False)
-                            else:
-                                tap(k * 75, 800 - j * 50, log=False)
-                        else:
+                player_now = take_screenshot(region=(33,56,167,69))
+                result = cv2.matchTemplate(player_now, player_turn, cv2.TM_CCOEFF_NORMED)
+                _, max_val, _, _ = cv2.minMaxLoc(result)
+                for i in range(n):
+                    if max_val >= 0.9 and find_image(["P_battle_baseattack", "P_battle_detail"], log=False):
+                        x,y = constants.L_battle_skill_co[temp]
+                        tap(x, y, log=False)
+                        temp = (temp+1) % n 
+                        if temp == start:
                             break
+                    else:
+                        break
             else:
                 for x, y, note in validated_enemies:
                     tap(x, y, note)
@@ -1906,141 +1903,258 @@ def trap2():    #隨機拆陷阱模式
             logger.info("[P_chest_gain, P_chest_scary, P_chest_ar]出現，結束循環")
             break
 def trap3():
-    """測速拆陷阱：白條進入黃色區域中段時點擊解除（最多嘗試 5 次）"""
-    logger.info("發現陷阱，state.trap_mode = 3（測速）")
-    state.trap_count += 1
-    # 進度條區域（使用者確認：y46-126，x 全寬 900）
+    """
+    測速拆陷阱：
+    - 每個 30 秒視窗只鎖定一次黃區
+    - 白條進入中段（或預判即將進入）就點「解除」
+    - 視窗超時強制點一次
+    - 總時間不限，直到成功或達 MAX_CLICKS
+    """
+    logger.info("發現陷阱，state.trap_mode = 3（測速預判，單次視窗30秒）")
+
     BAR_Y1, BAR_Y2 = 46, 126
     BAR_X1, BAR_X2 = 0, 900
-    CLICK_POS = constants.L_trap_remove  # (450, 1000)
+    CLICK_POS = constants.L_trap_remove
 
-    # 中段判定：只取黃區中間比例（避開左右邊緣的時間差）
-    MID_RATIO = 0.35          # 中段佔黃區寬度的比例（0.35 = 中間 35%）
-    MIN_ZONE_WIDTH = 40       # 黃區太窄則忽略
-    MAX_CLICKS = 5            # 最多嘗試點擊次數
+    MAX_CLICKS = 10
+    WINDOW = 30.0
+    LEAD_TIME = 0.35          # 預判提前量（秒）
+    EDGE_MARGIN = 25
+    MIN_SPEED = 40.0          # 低於此不走預判（中段直點不受限）
+    AFTER_CLICK_WAIT = 2.0
+    MID_HALF = 35             # 中段半寬 → 可點區約 70px（測試用略鬆）
+    MIN_ZONE_WIDTH = 40
 
-    start = time.time()
-    timeout = 60
-    click_cooldown = 0.0
     success_imgs = ["P_chest_gain", "P_chest_scary", "P_chest_ar"]
-    click_count = 0
 
-    while time.time() - start < timeout:
-        if state.stop_event.is_set():
-            logger.info("trap3 收到停止指令")
-            return False
+    def detect_yellow_zones(bar_bgr):
+        """回傳 [(mid_lo, mid_hi, mid_x, z1, z2), ...]，最多 2 段"""
+        b = bar_bgr[:, :, 0].astype(np.int16)
+        g = bar_bgr[:, :, 1].astype(np.int16)
+        r = bar_bgr[:, :, 2].astype(np.int16)
 
-        # 已出現結果畫面 → 成功結束
+        mask = (
+            (r > 140) & (g > 100) & (b < 120) &
+            (r > b + 40) & (g > b + 20)
+        ).astype(np.uint8) * 255
+
+        kernel = np.ones((3, 3), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+        col = np.any(mask > 0, axis=0)
+        raw_zones = []
+        i, n = 0, len(col)
+        while i < n:
+            if col[i]:
+                j = i
+                while j < n and col[j]:
+                    j += 1
+                if j - i >= MIN_ZONE_WIDTH:
+                    raw_zones.append((i, j - 1))
+                i = j
+            else:
+                i += 1
+
+        # 黏成一大段時試著切開
+        if len(raw_zones) == 1:
+            z1, z2 = raw_zones[0]
+            if z2 - z1 > 280:
+                segment = np.mean(mask[:, z1:z2 + 1] > 0, axis=0)
+                mid_region = segment[len(segment) // 4: 3 * len(segment) // 4]
+                if len(mid_region) > 0:
+                    split_off = len(segment) // 4 + int(np.argmin(mid_region))
+                    left = (z1, z1 + split_off)
+                    right = (z1 + split_off + 1, z2)
+                    raw_zones = []
+                    if left[1] - left[0] >= MIN_ZONE_WIDTH:
+                        raw_zones.append(left)
+                    if right[1] - right[0] >= MIN_ZONE_WIDTH:
+                        raw_zones.append(right)
+
+        raw_zones = sorted(raw_zones, key=lambda z: z[1] - z[0], reverse=True)[:2]
+        raw_zones = sorted(raw_zones, key=lambda z: z[0])
+
+        mids = []
+        for z1, z2 in raw_zones:
+            w = z2 - z1 + 1
+            mid_x = (z1 + z2) // 2
+            if w > MID_HALF * 2:
+                mid_lo = mid_x - MID_HALF
+                mid_hi = mid_x + MID_HALF - 1
+            else:
+                mid_lo, mid_hi = z1, z2
+            mids.append((mid_lo, mid_hi, mid_x, z1, z2))
+        return mids
+
+    def detect_white_x(bar_bgr):
+        """白條中心 x（相對 bar 左緣）"""
+        b, g, r = cv2.split(bar_bgr)
+        bright = (r.astype(np.int16) + g.astype(np.int16) + b.astype(np.int16)) > 600
+        low_chroma = (np.abs(r.astype(np.int16) - g) < 40) & (np.abs(g.astype(np.int16) - b) < 40)
+        mask = bright & low_chroma
+        col_sum = np.sum(mask, axis=0)
+        xs = np.where(col_sum > 2)[0]
+        if len(xs) == 0:
+            return None
+        return int(np.median(xs))
+
+    def do_click(label="解除陷阱"):
+        nonlocal click_count
+        tap(CLICK_POS[0], CLICK_POS[1], label)
+        click_count += 1
+        logger.info(f"trap3: 第 {click_count} 次點擊後等待 {AFTER_CLICK_WAIT}s 觀察")
+        time.sleep(AFTER_CLICK_WAIT)
         result = find_image(success_imgs, similarity=0.7, log=False)
         if result:
-            if result == "P_chest_ar":
-                state.trap_fail_count += 1
-            logger.info(f"陷阱解除成功，共點擊 {click_count} 次")
-            logger.info(f"統計trap3模式遇上陷阱{state.trap_count}次，失敗次數{state.trap_fail_count}次")
+            name = result[0] if isinstance(result, (list, tuple)) else result
+            if name == "P_chest_ar":
+                state.trap_ar_indicator = True
+            logger.info(f"陷阱解除成功（{name}），共點擊 {click_count} 次")
             return True
+        # UI 已消失且無成功圖 → 失敗
+        shot2 = take_screenshot()
+        if shot2 is not None:
+            bar2 = shot2[BAR_Y1:BAR_Y2, BAR_X1:BAR_X2]
+            if detect_white_x(bar2) is None and not detect_yellow_zones(bar2):
+                logger.warning(
+                    f"trap3: 點擊後陷阱 UI 消失且無成功圖，判定失敗（共點擊 {click_count} 次）"
+                )
+                return False
+        return None  # 繼續下一視窗
 
-        # 已達最大點擊次數
-        if click_count >= MAX_CLICKS:
-            logger.warning(f"trap3 已達最大點擊次數 {MAX_CLICKS}，停止嘗試")
-            break
+    click_count = 0
 
-        img = take_screenshot()
-        if img is None:
-            time.sleep(0.02)
-            continue
+    while click_count < MAX_CLICKS:
+        if state.stop_event.is_set():
+            return False
 
-        # OpenCV BGR
-        bar = img[BAR_Y1:BAR_Y2, BAR_X1:BAR_X2]
-        if bar.size == 0:
-            logger.debug("trap3: 進度條裁切為空，跳過")
-            time.sleep(0.02)
-            continue
+        window_start = time.time()
+        prev_x, prev_t = None, None
+        velocity = 0.0
+        clicked_this_window = False
+        cached_mids = None
+        frame = 0
 
-        b = bar[:, :, 0].astype(int)
-        g = bar[:, :, 1].astype(int)
-        r = bar[:, :, 2].astype(int)
+        logger.info(f"trap3: 開始第 {click_count + 1} 次判定視窗（{WINDOW}s）")
 
-        # 黃色成功區
-        is_yellow = (r > 180) & (g > 100) & (g < 230) & (b < 120)
-        # 白條
-        is_white = (r > 210) & (g > 210) & (b > 210)
+        while time.time() - window_start < WINDOW:
+            if state.stop_event.is_set():
+                return False
+            frame += 1
 
-        # --- 找出黃色區間 ---
-        col_yellow = is_yellow.sum(axis=0) > 8
-        zones = []
-        in_zone = False
-        z_start = 0
-        for i, v in enumerate(col_yellow):
-            if v and not in_zone:
-                z_start = i
-                in_zone = True
-            elif not v and in_zone:
-                if i - z_start >= MIN_ZONE_WIDTH:
-                    zones.append((z_start, i))
-                in_zone = False
-        if in_zone and len(col_yellow) - z_start >= MIN_ZONE_WIDTH:
-            zones.append((z_start, len(col_yellow)))
+            # 成功檢查（降頻）
+            if frame % 5 == 1:
+                result = find_image(success_imgs, similarity=0.7, log=False)
+                if result:
+                    name = result[0] if isinstance(result, (list, tuple)) else result
+                    if name == "P_chest_ar":
+                        state.trap_ar_indicator = True
+                    logger.info(f"陷阱解除成功（{name}），共點擊 {click_count} 次")
+                    return True
 
-        # --- 白條 x（螢幕絕對座標，BAR_X1=0）---
-        white_cols = np.where(is_white.sum(axis=0) > 2)[0]
-        if len(white_cols) == 0:
-            logger.debug(f"trap3: 未偵測到白條 | zones={zones}")
-            time.sleep(0.02)
-            continue
-        if len(zones) == 0:
-            logger.debug(f"trap3: 未偵測到黃區 | white_x={int(np.median(white_cols))}")
-            time.sleep(0.02)
-            continue
-
-        white_x = int(np.median(white_cols))
-
-        # --- 只取每個黃區的中段 ---
-        mid_zones = []
-        for z0, z1 in zones:
-            width = z1 - z0
-            if width < MIN_ZONE_WIDTH:
+            shot = take_screenshot()
+            if shot is None:
+                time.sleep(0.02)
                 continue
-            mid_half = width * MID_RATIO / 2.0
-            center = (z0 + z1) / 2.0
-            m0 = int(center - mid_half)
-            m1 = int(center + mid_half)
-            mid_zones.append((m0, m1))
+            now = time.time()
+            bar = shot[BAR_Y1:BAR_Y2, BAR_X1:BAR_X2]
+            if bar.size == 0:
+                time.sleep(0.02)
+                continue
 
-        in_mid = any(m0 <= white_x <= m1 for m0, m1 in mid_zones)
+            # 黃區只鎖定一次
+            if cached_mids is None:
+                cached_mids = detect_yellow_zones(bar)
+                if not cached_mids:
+                    time.sleep(0.05)
+                    continue
+                for mid_lo, mid_hi, mid_x, z1, z2 in cached_mids:
+                    logger.info(
+                        f"trap3 鎖定黃區: [{z1},{z2}] 寬度={z2 - z1 + 1}px, "
+                        f"可點=[{mid_lo},{mid_hi}] mid_x={mid_x}"
+                    )
+            mids = cached_mids
 
-        logger.debug(
-            f"trap3: white_x={white_x} | zones={zones} | mid_zones={mid_zones} | "
-            f"in_mid={in_mid} | clicks={click_count}/{MAX_CLICKS}"
-        )
+            white_x = detect_white_x(bar)
+            if white_x is None:
+                time.sleep(0.02)
+                continue
 
-        now = time.time()
-        if in_mid and now >= click_cooldown:
-            logger.info(
-                f"白條 x={white_x} 落入黃區中段 {mid_zones}，點擊解除 "
-                f"(elapsed={now - start:.1f}s, click#{click_count + 1}/{MAX_CLICKS})"
-            )
-            tap(CLICK_POS[0], CLICK_POS[1], "解除陷阱")
-            click_count += 1
-            click_cooldown = now + 0.35
-            time.sleep(0.15)
+            # 測速 + 折返
+            if prev_x is not None and prev_t is not None:
+                dt = now - prev_t
+                if dt > 0.01:
+                    raw_v = (white_x - prev_x) / dt
+                    velocity = 0.6 * velocity + 0.4 * raw_v if abs(velocity) > 1 else raw_v
+                    at_left = white_x < EDGE_MARGIN
+                    at_right = white_x > (BAR_X2 - BAR_X1 - EDGE_MARGIN)
+                    if (at_left or at_right) and abs(raw_v) > MIN_SPEED and velocity * raw_v < 0:
+                        velocity = raw_v
+                        logger.debug(f"trap3: 折返 x={white_x}, v={velocity:.1f}")
+            prev_x, prev_t = white_x, now
 
-            result = find_image(success_imgs, similarity=0.7, log=False)
-            if result:
-                if result == "P_chest_ar":
-                    state.trap_fail_count += 1
-                logger.info(f"陷阱解除成功，共點擊 {click_count} 次")
-                logger.info(f"統計trap3模式遇上陷阱{state.trap_count}次，失敗次數{state.trap_fail_count}次")
-                return True
-        else:
+            # A. 中段直點（不看速度）
+            for mid_lo, mid_hi, mid_x, z1, z2 in mids:
+                if mid_lo <= white_x <= mid_hi:
+                    logger.info(
+                        f"trap3: 中段直點 x={white_x}, zone=[{mid_lo},{mid_hi}], mid={mid_x}"
+                    )
+                    outcome = do_click("解除陷阱")
+                    if outcome is True:
+                        return True
+                    if outcome is False:
+                        return False
+                    clicked_this_window = True
+                    break
+            if clicked_this_window:
+                break
+
+            # B. 速度預判
+            if abs(velocity) < MIN_SPEED:
+                time.sleep(0.02)
+                continue
+
+            candidates = []
+            for mid_lo, mid_hi, mid_x, z1, z2 in mids:
+                dx = mid_x - white_x
+                if velocity > 0 and dx > 0:
+                    candidates.append((dx / velocity, mid_x, mid_lo, mid_hi))
+                elif velocity < 0 and dx < 0:
+                    candidates.append((dx / velocity, mid_x, mid_lo, mid_hi))
+
+            if not candidates:
+                time.sleep(0.02)
+                continue
+
+            candidates.sort(key=lambda c: c[0])
+            t_eta, mid_x, mid_lo, mid_hi = candidates[0]
+            if 0 < t_eta <= LEAD_TIME:
+                logger.info(
+                    f"trap3: 預判點擊 x={white_x}, mid={mid_x}, "
+                    f"t_eta={t_eta:.3f}s, v={velocity:.1f}"
+                )
+                outcome = do_click("解除陷阱")
+                if outcome is True:
+                    return True
+                if outcome is False:
+                    return False
+                clicked_this_window = True
+                break
+
             time.sleep(0.02)
 
-    # 超時或達最大次數後的收尾
-    if click_count >= MAX_CLICKS:
-        logger.warning(f"trap3 已點滿 {MAX_CLICKS} 次仍未成功")
-    else:
-        logger.warning(f"trap3 超時({timeout}s)，共點擊 {click_count} 次")
+        # 視窗超時且本視窗沒點過 → 強制點一次
+        if not clicked_this_window:
+            logger.warning(f"trap3: {WINDOW}s 內未命中，強制點擊解除")
+            outcome = do_click("解除陷阱(超時強制)")
+            if outcome is True:
+                return True
+            if outcome is False:
+                return False
 
-    return True
+    logger.warning(f"trap3 失敗：已達 MAX_CLICKS={MAX_CLICKS}")
+    return False
 
 # 跑圖函數
 def comment_check():
@@ -2073,6 +2187,7 @@ def common_reaction(match, stage): #基本動作處理
     """
     def stage_check(stage):
         wait_image("P_exit", timeout=3)
+        logger.info(f"state.stage = {state.stage}")
         if state.stage == "Cmove":
             if find_image("P_Cmove", similarity=0.7):
                 click_image("P_Cmove", timeout=3)
@@ -2406,6 +2521,7 @@ def goToMark(target=None, target_sim=0.6, marker=1): #自動前往標記位置
                 images_list.insert(item, target[item])
         else:
             images_list.insert(0, target)
+            target = [target]
     checkpoint = marker
     match = None
     for goal in range(checkpoint):
@@ -2420,7 +2536,9 @@ def goToMark(target=None, target_sim=0.6, marker=1): #自動前往標記位置
                     return True
             match = wait_image(images_list)
             logger.info(f"找到匹配: {match}")
-            if match == "P_exit":
+            if target is not None and match in target:
+                break
+            elif match == "P_exit":
                 if image_stability("P_exit", max_attempts=1):
                     health_check()
                     if auto_mark():

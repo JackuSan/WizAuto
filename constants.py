@@ -3,7 +3,7 @@
 import os
 
 GAME_PACKAGE = "jp.co.drecom.wizardry.daphne"
-VERSION = "4.5.1"
+VERSION = "4.5.2"
 ADB_HOST = "127.0.0.1"
 DEFAULT_IMAGE_DIR = "./images/"
 
@@ -130,11 +130,11 @@ script_remainder = {
             "懸賞令周回(蠍子女)": {"起點": "任一章城鎮", 
                            "旅館" : ["不休息", "野外補給", "標準房", "豪華房"],
                            "異常狀態": "封技、封魔、詛咒",
-                            "提示": ["1. 要在蠍子女位置加標記"]},
+                            "提示": ["1. 要在蠍子女位置加標記", "2. 巨人戰鬥會啟用技能戰鬥順序"]},
             "懸賞令周回(牛頭人)": {"起點": "任一章城鎮", 
                            "旅館" : ["不休息", "野外補給", "標準房", "豪華房"],
                            "異常狀態": "封技、封魔、詛咒",
-                            "提示": ["1. 要點兩個標記","2. 怪很痛"]},
+                            "提示": ["1. 要點兩個標記","2. 怪很痛", "3. 巨人戰鬥會啟用技能戰鬥順序"]},
             "懸賞令周回(沉穩的騙子布洛克)": {"起點": "任一章城鎮", 
                            "旅館" : ["不休息", "野外補給", "標準房", "豪華房"],
                            "異常狀態": "無",
@@ -187,6 +187,15 @@ L_heal_button_npc = (740, 795)
 L_heal_button_main = (840, 795)
 L_magnifier = (52, 1181)
 L_fasttalking = (240, 1486)
+L_battle_skill_co = []
+for row in range(1,4):
+    for column in range (1,13):
+        if column == 12:
+            L_battle_skill_co.append((899, 800 - row * 50))
+        else:
+            L_battle_skill_co.append((column * 75, 800 - row * 50))
+    
+
 
 # 常用範圍
 R_char_dungeon = (

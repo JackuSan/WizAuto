@@ -1282,7 +1282,11 @@ def Farm_ch4B7F_2():
                 exitLog("起點不正確, 請移到第四章郊外看到「豪雪地帶」的位置") 
             ch4_pre()
         wait_image("P_exit")
-        goToMark("P_ch4_B7F_minimap1")
+        if state.run_count == 0:
+            reteam_pre()
+        else:
+            reteam()
+        goToMark("P_ch4_B7F_minimap1", marker=2)
         goToMark("P_ch4_B6F_minimap3")
         exitMap(["P_back", "P_buff", "P_ch4_B7F_inside"])
         if not find_image("P_back"):
@@ -1355,28 +1359,6 @@ def Farm_GrudgeCave():
 def Farm_bounty_ScorpionGirl():
     """懸賞令周回(蠍子女)"""
     # (state) global state.run_count, state.paused, state.trap_char_all_scared, state.inn_mode
-    def battle_handle():
-        for i in range(20):
-            match = wait_image(["P_battle_bar", "P_chest_open", "P_exit", "P_battle_death_main", "P_battle_death_npc1", "P_battle_death_npc2"], 
-                               similarity=0.8)
-            if match == "P_battle_bar":
-                time.sleep(0.5)
-                tap(553,1103, "右下技能")
-                if not click_image("P_aoe_confirm", timeout=2, fail_count=False):
-                    tap(300, 800, "左蠍女")
-                    tap(600, 800, "右蠍女")
-            elif match == "P_chest_open":
-                open_chest()
-            elif match == "P_exit":
-                if image_stability("P_exit", max_attempts=1):
-                    break
-            elif match == "P_battle_death_main":
-                revive_main()
-                wait_image("P_exit")
-                time.sleep(1)
-                press_key("w")
-            elif match in ["P_battle_death_npc1", "P_battle_death_npc2"]:
-                revive_npc()
     try:
         if state.stop_event.is_set():
             logger.info("收到停止指令，終止測試腳本")
@@ -1421,7 +1403,8 @@ def Farm_bounty_ScorpionGirl():
             reteam_pre()
         else:
             reteam()
-        goToMark()
+        goToMark("P_battle_bar")
+        battle_skill(mode=2)
         exitMap(["P_back", "P_buff"], heal_check=False)
         harken_check("P_town")
         wait_image("P_town")
@@ -1470,6 +1453,7 @@ def Farm_bounty_CowMan():
         time.sleep(1)
         switch_wheel("P_wheel_saveduke", 3)
         wait_image("P_house")
+        inn_check()
         click_image("P_guild")
         click_image("P_bounty_dialog1")
         click_image("P_guild_request")
@@ -1496,7 +1480,8 @@ def Farm_bounty_CowMan():
             reteam_pre()
         else:
             reteam()
-        goToMark("P_bounty_cow_minimap")    
+        goToMark("P_battle_bar")
+        battle_skill([(450, 850, "牛頭人")], mode=2)
         exitMap(["P_back", "P_buff"], heal_check=False)
         harken_check("P_town")
         wait_image("P_town")
@@ -2287,8 +2272,9 @@ def Farm_ch4B10F_SnowGlant():
                 break
         if wait_image(["P_chest_open", "P_exit"]) == "P_chest_open":
             open_chest()
-        time.sleep(2)
-        press_key("s")
+        #time.sleep(2)
+        #press_key("s")
+        goToMark()
         exitMap(["P_buff", "P_back"])
         core.harken_check("P_village")
         click_image("P_village")
@@ -2318,7 +2304,8 @@ def Farm_FF11_B4F():
         goToDungeon_check()
         wait_image("P_exit")
         goToMark("P_FF11_B4F_minimap1")
-        find_chest_process(map=["P_Farm_FF11_B4F_chestarea1", "P_Farm_FF11_B4F_chestarea2"], direction = None, forbidden_mode=False)
+        find_chest_process(map=["P_Farm_FF11_B4F_chestarea1"], direction = None, forbidden_mode=False)
+        find_chest_process(map=["P_Farm_FF11_B4F_chestarea2"], direction = None, forbidden_mode=False)
         exitMap(["P_back", "P_buff"])
         harken_check("P_FF11_B3F")
         wait_image("P_FF11_B3F")
