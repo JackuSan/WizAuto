@@ -909,6 +909,57 @@ def Farm_CowCave2():
     except StopIteration:
         logger.info("主循環被中斷，腳本終止")
         raise
+def Farm_CowCave3(): 
+    """刷牛牛洞周回雜物/遺物"""
+    # (state) global state.run_count, state.paused, state.trap_char_all_scared, state.inn_mode
+    try:
+        if state.stop_event.is_set():
+            logger.info("收到停止指令，終止牛牛洞周回雜物/遺物")
+            raise StopIteration
+        if state.paused:
+            logger.info("腳本已暫停，等待繼續")
+            while state.paused and not state.stop_event.is_set():
+                time.sleep(0.1)
+        if not find_image("P_map_cowcave"):
+            exitLog("起點不正確, 請大地圖看到牛牛洞")
+        if state.inn_mode == 2 or state.inn_mode == 1:
+            exitLog("此腳本不能使用「地城露營」及「野外補給」休息模式")
+        if not find_image("P_map_cowcave"):
+            for i in range(2):
+                tap(constants.L_map_scalesmall[0], constants.L_map_scalesmall[1], "縮小地圖")
+                time.sleep(0.5)
+            tap(constants.L_map_scalebig[0], constants.L_map_scalebig[1], "放大地圖")
+            if not find_image("P_map_cowcave"):
+                exitLog("起點不正確, 請移到第一章城鎮")
+        click_image("P_map_cowcave")
+        goToDungeon_check()
+        wait_image("P_exit")
+        if state.run_count == 0:
+            reteam_pre()
+        else:
+            reteam()
+        find_chest_auto()
+        exitMap("P_map_cowcave")
+        if state.inn_mode == 3 or state.inn_mode == 4:
+            tap(constants.L_map_scalesmall[0], constants.L_map_scalesmall[1], "縮小地圖")
+            click_image("P_chapter1")
+            inn_check()
+            general_inn_mode(mode=2)
+            wait_image("P_house")
+            inn_check()
+            map_click()
+            for i in range(2):
+                tap(constants.L_map_scalesmall[0], constants.L_map_scalesmall[1], "縮小地圖")
+                time.sleep(0.5)
+            tap(constants.L_map_scalebig[0], constants.L_map_scalebig[1], "放大地圖")
+            time.sleep(1)
+            swipe(450, 400, 450, 1200, 500)
+        wait_image("P_map_cowcave")
+        state.run_count += 1
+        logger.info(f"刷牛洞牛牛周回完成，當前次數: {state.run_count}")
+    except StopIteration:
+        logger.info("主循環被中斷，腳本終止")
+        raise
 def Farm_expCH2_2():
     """刷經驗任務之第二章擊退敵方勢力(無腦開右下技能版)"""
     # (state) global state.run_count, state.paused, state.trap_char_all_scared, state.handle_loop_list, state.inn_mode
@@ -1019,9 +1070,6 @@ def Farm_ch2B9F():
                                 "P_Farm_ch2B9F_chestarea4", "P_Farm_ch2B9F_chestarea5", "P_Farm_ch2B9F_chestarea6"], 
                            direction = None, forbidden_mode=False)
         exitMap(["P_back", "P_buff"])
-        if not find_image("P_back"):
-            click_image("P_buff")
-        click_image("P_back")
         harken_check("P_ch2_outside")
         wait_image("P_ch2_outside")
         general_inn_mode(mode=1)
@@ -1063,6 +1111,35 @@ def Farm_ch2B1F():
         wait_image("P_town")
         state.run_count += 1
         logger.info(f"第二章一號街周回完成，當前次數: {state.run_count}")
+    except StopIteration:
+        logger.info("主循環被中斷，腳本終止")
+        raise
+def Farm_ch2B10F():
+    """第二章B10F刷不死異形(BUG)"""
+    # (state) global state.run_count, state.paused, state.trap_char_all_scared, state.inn_mode
+    try:
+        if state.stop_event.is_set():
+            logger.info("收到停止指令，終止測試腳本")
+            raise StopIteration
+        if state.paused:
+            logger.info("腳本已暫停，等待繼續")
+            while state.paused and not state.stop_event.is_set():
+                time.sleep(0.1)
+        if not find_image("P_exit"):
+            exitLog("起點不正確, 請移到第二章B10F甲板內") 
+        if state.inn_mode != 0:
+            exitLog("此腳本只能使用「不休息」休息模式")
+        goToMark("P_ch2_B10F_BugMon")
+        click_image("P_ch2_B10F_BugMon")
+        for i in range(100):
+            if find_image("P_fastbattle_inactive", similarity=0.8, log=False):
+                click_image("P_fastbattle_inactive", similarity=0.8, timeout=3)
+            if find_image(constants.P_AUTOBATTLE_INACTIVE_LIST,similarity=0.75, log=False):
+                click_image(constants.P_AUTOBATTLE_INACTIVE_LIST, timeout=3)
+            if find_image("P_exit", log=False):
+                break
+        state.run_count += 1
+        logger.info(f"第二章B10F刷不死異形(BUG)完成，當前次數: {state.run_count}")
     except StopIteration:
         logger.info("主循環被中斷，腳本終止")
         raise
@@ -2346,6 +2423,22 @@ def test():
             while state.paused and not state.stop_event.is_set():
                 time.sleep(0.1)
         #在此輸入
+        exitMap("P_map_cowcave")
+        if state.inn_mode == 3 or state.inn_mode == 4:
+            tap(constants.L_map_scalesmall[0], constants.L_map_scalesmall[1], "縮小地圖")
+            click_image("P_chapter1")
+            inn_check()
+            general_inn_mode(mode=2)
+            wait_image("P_house")
+            inn_check()
+            map_click()
+            for i in range(2):
+                tap(constants.L_map_scalesmall[0], constants.L_map_scalesmall[1], "縮小地圖")
+                time.sleep(0.5)
+            tap(constants.L_map_scalebig[0], constants.L_map_scalebig[1], "放大地圖")
+            time.sleep(1)
+            swipe(450, 400, 450, 1200, 500)
+        wait_image("P_map_cowcave")
         
         state.run_count += 1
     except StopIteration:

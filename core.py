@@ -1857,6 +1857,7 @@ def open_chest():   #開箱流程
                 for item in ["P_battle_death_main", "P_fastbattle_active", "P_fastbattle_inactive"]:
                     match_list.append(item)
                 match_list.remove("P_exit")
+                click_image(match_list, timeout=3, fail_count=False)
             elif match == "P_chest_gain":
                 match_list = ["P_chest_gain", "P_chest_lost", "P_exit", "P_chest_open", "P_fastbattle_active", "P_fastbattle_inactive"]
                 if state.target_until:
@@ -1864,7 +1865,11 @@ def open_chest():   #開箱流程
                     for item in until_list:
                         if not item in match_list:
                             match_list.append(item)
-            click_image(match_list, timeout=3, fail_count=False) #用match_list有機會點了P_exit!!
+                match_list.remove("P_exit")
+                click_image(match_list, timeout=3, fail_count=False) #用match_list有機會點了P_exit!!
+                match_list.append("P_exit")
+            else:
+                click_image(match_list, timeout=3, fail_count=False) 
         elif match == "P_exit":
             if image_stability("P_exit", max_attempts=2):
                 logger.info(f"匹配到P_exit，完成物品獲取")
@@ -2301,7 +2306,7 @@ def common_reaction(match, stage): #基本動作處理
         if temp_check == "P_dungeon_suspicious_trader_lookgoods":
             click_image("P_dungeon_suspicious_trader_buy2000")
         click_image("P_dungeon_gain")
-        stage_check(state.stage)
+        #stage_check(state.stage)
     #觸發骨頭商人選項
     elif match == "P_dungeon_bone_trader":
         click_image("P_dungeon_bone_trader")

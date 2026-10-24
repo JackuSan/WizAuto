@@ -97,6 +97,7 @@ class AutomationGUI:
                                             values=["皇女7000g刷錢", 
                                                     "第二章第一街B1F周回雜物",
                                                     "第二章船二周回雜物", 
+                                                    "第二章B10F刷不死異形(BUG)",
                                                     "第三章第七區周回巨人", 
                                                     "第四章B1F周回雜物",
                                                     "第四章B4F周回雪山兇鳥帽",
@@ -116,6 +117,7 @@ class AutomationGUI:
                                                     #"陽炎洞窟B1F右上打怪周回雜物", 
                                                     #"牛牛洞重置任務刷一隻牛",
                                                     "牛牛洞刷精靈甲", 
+                                                    "牛牛洞周回雜物/遺物",
                                                     "土之洞窟周回雜物", 
                                                     "火之洞窟周回雜物", 
                                                     "風之洞窟周回雜物",
@@ -375,6 +377,10 @@ class AutomationGUI:
         logger.info(f"支援休息模式: {inn_list}")
         logger.info(f"腳本起點: {script_map[script]["起點"]}")
         logger.info(f"異常狀態: {script_map[script]["異常狀態"]}")
+        if "重點遺物" in script_map.get(script, {}):
+                    tips_len = len(script_map[script]["重點遺物"])
+                    for i in range(tips_len):
+                        logger.info(f"重點遺物: {script_map[script]["重點遺物"][i]}")
         if "提示" in script_map.get(script, {}):
             tips_len = len(script_map[script]["提示"])
             for i in range(tips_len):
@@ -609,7 +615,7 @@ class AutomationGUI:
             # (state) global state.handle_loop_list, state.debuff_list, state.run_count, state.chest_count, state.list_update_status, state.first_freeze_screen_check, state.revived_bol, state.minimap_list, state.freeze_screen_check_time, state.on9npc_list, state.personality_count, state.equip_count
             logger.info("執行腳本前先重置變數")
             state.handle_loop_list = constants.HANDLE_LOOP_LIST_START[:]
-            state.minimap_list = state.freeze_screen_check_time = None
+            state.minimap_list = state.freeze_screen_check_time = state.target_until = None
             state.on9npc_list = []
             state.debuff_list = constants.DEBUFF_LIST_START[:]
             state.run_count = state.chest_count = state.equip_count = state.personality_count = state.trap3_count = state.trap_fail_count = 0
@@ -636,6 +642,8 @@ class AutomationGUI:
                     farm.Farm_ch2B1F()
                 elif self.script_choice.get() == "第二章船二周回雜物":
                     farm.Farm_ch2B9F()
+                elif self.script_choice.get() == "第二章B10F刷不死異形(BUG)":
+                    farm.Farm_ch2B10F()
                 elif self.script_choice.get() == "第三章第七區周回巨人":
                     farm.Farm_ch3B7F()
                 elif self.script_choice.get() == "第四章B1F周回雜物":
@@ -674,6 +682,8 @@ class AutomationGUI:
                     farm.Farm_CowCave1()
                 elif self.script_choice.get() == "牛牛洞刷精靈甲":
                     farm.Farm_CowCave2()
+                elif self.script_choice.get() == "牛牛洞周回雜物/遺物":
+                    farm.Farm_CowCave3()
                 elif self.script_choice.get() == "土之洞窟周回雜物":
                     farm.Farm_EarthCave()
                 elif self.script_choice.get() == "火之洞窟周回雜物":
