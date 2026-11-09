@@ -1159,7 +1159,7 @@ def waitVanish(image_list, similarity=0.7, region=None, timeout=120):   #等待�
 def waitBattleVanish(similarity=0.7, region=None, timeout=120):   #等待戰鬥消失
     """等待某一圖像消失"""
     logger.info(f"waitBattleVanish開始, 相似度要求{similarity}, 範圍{region}, 最長時限{timeout}秒")
-    image_list = ["P_fastbattle_active", "P_fastbattle_inactive", "P_battle_detail"] 
+    image_list = ["P_fastbattle_active", "P_fastbattle_inactive", "P_battle_detail"]
     match = find_image(image_list, similarity=similarity, region=region, log=False)
     if match:
         logger.info(f"找到{image_list}，等待{image_list}消失")
@@ -1172,6 +1172,11 @@ def waitBattleVanish(similarity=0.7, region=None, timeout=120):   #等待戰鬥�
     while (time.time() - start_time) < timeout:
         if match_count <= 3:
             time.sleep(0.01)
+            if state.target_until:
+                targets = state.target_until if isinstance(state.target_until, list) else [state.target_until]
+                if find_image(targets, log=False):
+                    logger.info(f"waitBattleVanish：已見到 target_until {targets}，提早結束")
+                    return True
             match = find_image(image_list, similarity=similarity, region=region, log=False)
             if match:
                 match_count = 0
@@ -1574,7 +1579,9 @@ def battle_skill(enemy_list=None, mode=1): #技能戰鬥
     n = len(constants.L_battle_skill_co)
     for i in range(100):
         match = wait_image(image_list, similarity=0.8, timeout=3)
-        if match in ["P_battle_bar", "P_battle_detail"]:
+        if match is None:
+            continue
+        elif match in ["P_battle_bar", "P_battle_detail"]:
             time.sleep(0.5)
 
             # ===== 決定要使用的技能 =====
@@ -2375,7 +2382,9 @@ def handle_loop(target, timeout=10000):   #動作處理loop
         if match == None:
             loop_counter += 1
         logger.info(f"handle_loop 期間，目標: {target}，找到: {match}")
-        if match == target or match in target:
+        if match is None:
+            continue
+        elif match == target or match in target:
             logger.info(f"找到目標 {target}")
             if image_stability(target):
                 logger.info(f"確認找到 {target}，退出循環")
@@ -2541,7 +2550,9 @@ def goToMark(target=None, target_sim=0.6, marker=1): #自動前往標記位置
                     return True
             match = wait_image(images_list)
             logger.info(f"找到匹配: {match}")
-            if target is not None and match in target:
+            if match is None:
+                continue
+            elif target is not None and match in target:
                 break
             elif match == "P_exit":
                 if image_stability("P_exit", max_attempts=1):

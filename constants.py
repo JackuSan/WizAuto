@@ -3,7 +3,7 @@
 import os
 
 GAME_PACKAGE = "jp.co.drecom.wizardry.daphne"
-VERSION = "4.5.3"
+VERSION = "4.5.4"
 ADB_HOST = "127.0.0.1"
 DEFAULT_IMAGE_DIR = "./images/"
 

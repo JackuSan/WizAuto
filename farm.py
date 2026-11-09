@@ -1005,9 +1005,6 @@ def Farm_expCH2_2():
             click_image("P_expCH2_optionB")
         wait_image("P_exit")
         goToMark(["P_back", "P_buff"])
-        if not find_image("P_back"):
-            click_image("P_buff")
-        click_image("P_back")
         harken_check("P_ch2_outside")
         if state.inn_mode == 2:
             click_image("P_town")
@@ -1480,7 +1477,7 @@ def Farm_bounty_ScorpionGirl():
             reteam_pre()
         else:
             reteam()
-        goToMark("P_battle_bar")
+        goToMark("P_battle_baseattack")
         battle_skill(mode=2)
         exitMap(["P_back", "P_buff"], heal_check=False)
         harken_check("P_town")
@@ -1890,9 +1887,10 @@ def Farm_2Wbone():
         click_image("P_2Wbone")
         goToDungeon_check()
         wait_image("P_2Wbone_minimap1")
-        goMap("P_2Wbone_checkpoint1", "P_2Wbone_minimap2")
-        goMap("P_2Wbone_checkpoint2", "P_2Wbone_minimap3")
-        goMap("P_2Wbone_checkpoint3", "P_2Wbone_minimap4")
+        goToMark("P_2Wbone_minimap4")
+        #goMap("P_2Wbone_checkpoint1", "P_2Wbone_minimap2")
+        #goMap("P_2Wbone_checkpoint2", "P_2Wbone_minimap3")
+        #goMap("P_2Wbone_checkpoint3", "P_2Wbone_minimap4")
         exitMap("P_2Wbone")
         if (state.run_count+1)%state.heal_period == 0:
             if state.inn_mode == 3 or state.inn_mode == 4:
