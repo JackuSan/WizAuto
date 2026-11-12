@@ -3,7 +3,7 @@
 import os
 
 GAME_PACKAGE = "jp.co.drecom.wizardry.daphne"
-VERSION = "4.5.4"
+VERSION = "4.5.5"
 ADB_HOST = "127.0.0.1"
 DEFAULT_IMAGE_DIR = "./images/"
 
@@ -308,6 +308,9 @@ image_files = {
     "P_guild_request_completed": "P_guild_request_completed.png",
     "P_guild_dialog_welcomeback": "P_guild_dialog_welcomeback.png",
     "P_guild_leave": "P_guild_leave.png",
+    "P_bounty_reset_button": "P_bounty_reset_button.png",
+    "P_bounty_reset_icon": "P_bounty_reset_icon.png",
+    "P_bounty_reset_selectall": "P_bounty_reset_selectall.png",
     "P_guild_bounty": "P_guild_bounty.png",
     "P_guild_bounty_back": "P_guild_bounty_back.png",
     "P_guild_bounty_close": "P_guild_bounty_close.png",

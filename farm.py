@@ -63,6 +63,7 @@ force_stop_game = core.force_stop_game
 start_game_app = core.start_game_app
 game_restart = core.game_restart
 harken_check = core.harken_check
+bounty_reset = core.bounty_reset
 
 def Farm_7000g():
     """皇女7000g刷錢"""
@@ -1442,17 +1443,10 @@ def Farm_bounty_ScorpionGirl():
             while state.paused and not state.stop_event.is_set():
                 time.sleep(0.1)
         if not find_image("P_house"):
-            exitLog("起點不正確, 請移到任一城鎮能看到荒屋")
+            exitLog("起點不正確, 請移到第一章城鎮能看到荒屋")
         if state.inn_mode == 2:
             exitLog("此腳本不能使用「地城露營」休息模式")
-        click_image("P_house")
-        click_image("P_wheel")
-        wait_image("P_wheel_special_request")
-        time.sleep(1)
-        switch_wheel("P_wheel_saveduke", 3)
-        wait_image("P_house")
         click_image("P_guild")
-        click_image("P_bounty_dialog1")
         click_image("P_guild_request")
         wait_image("P_guild_request_special")
         if find_image("P_guild_bounty"):
@@ -1460,10 +1454,11 @@ def Farm_bounty_ScorpionGirl():
         else:
             swipe(530, 1408, 400, 1408, 500)
             click_image("P_guild_bounty")
-        time.sleep(2)
-        check = wait_image(["P_guild_bounty_close", "P_guild_bounty_back"])
-        if check == "P_guild_bounty_close":
-            click_image("P_guild_bounty_close")
+        time.sleep(1)
+        #check = wait_image(["P_guild_bounty_close", "P_guild_bounty_back"])
+        #if check == "P_guild_bounty_close":
+        #    click_image("P_guild_bounty_close")
+        bounty_reset()
         click_image("P_guild_bounty_back")
         click_image("P_guild_leave")
         time.sleep(1)
@@ -1518,18 +1513,10 @@ def Farm_bounty_CowMan():
             while state.paused and not state.stop_event.is_set():
                 time.sleep(0.1)
         if not find_image("P_house"):
-            exitLog("起點不正確, 請移到任一城鎮能看到荒屋")
+            exitLog("起點不正確, 請移到第一章城鎮能看到荒屋")
         if state.inn_mode == 2:
             exitLog("此腳本不能使用「地城露營」休息模式")
-        click_image("P_house")
-        click_image("P_wheel")
-        wait_image("P_wheel_special_request")
-        time.sleep(1)
-        switch_wheel("P_wheel_saveduke", 3)
-        wait_image("P_house")
-        inn_check()
         click_image("P_guild")
-        click_image("P_bounty_dialog1")
         click_image("P_guild_request")
         wait_image("P_guild_request_special")
         if find_image("P_guild_bounty"):
@@ -1537,10 +1524,8 @@ def Farm_bounty_CowMan():
         else:
             swipe(530, 1408, 400, 1408, 500)
             click_image("P_guild_bounty")
-        time.sleep(2)
-        check = wait_image(["P_guild_bounty_close", "P_guild_bounty_back"])
-        if check == "P_guild_bounty_close":
-            click_image("P_guild_bounty_close")
+        time.sleep(1)
+        bounty_reset()
         click_image("P_guild_bounty_back")
         click_image("P_guild_leave")
         time.sleep(1)
@@ -1595,7 +1580,7 @@ def Farm_bounty_faker():
             while state.paused and not state.stop_event.is_set():
                 time.sleep(0.1)
         if not find_image("P_house"):
-            exitLog("起點不正確, 請移到任一城鎮能看到荒屋")
+            exitLog("起點不正確, 請移第一章城鎮能看到荒屋")
         if state.inn_mode == 2:
             exitLog("此腳本不能使用「地城露營」休息模式")
         if state.run_count == 0:
@@ -1603,26 +1588,7 @@ def Farm_bounty_faker():
                 name = "P_ch1_on9npc" + str(i+1)
                 state.handle_loop_list.append(name)
             logger.info(f"首次執行，增加所需變數，目前handle_loop_list:{state.handle_loop_list}")
-        click_image("P_house")
-        click_image("P_wheel")
-        wait_image("P_wheel_special_request")
-        time.sleep(1)
-        if find_image("P_wheel_saveduke", similarity=0.8):
-            click_image("P_wheel_saveduke", similarity=0.8)
-        else:
-            if find_image("P_wheel_ch3"):
-                swipe(100, 900, 700, 900, 500)
-            elif find_image("P_wheel_ch1"):
-                swipe(700, 900, 100, 900, 500)
-            swipe(700, 900, 100, 900, 500)
-            if find_image("P_wheel_saveduke", similarity=0.8):
-                click_image("P_wheel_saveduke", similarity=0.8)
-            else:
-                exitLog("腳本中斷, 原因:沒有找到「營救公爵的委託」節點")
-        click_image("P_wheel_jump")
-        wait_image("P_house")
         click_image("P_guild")
-        click_image("P_bounty_dialog1")
         click_image("P_guild_request")
         wait_image("P_guild_request_special")
         if find_image("P_guild_bounty"):
@@ -2421,22 +2387,7 @@ def test():
             while state.paused and not state.stop_event.is_set():
                 time.sleep(0.1)
         #在此輸入
-        exitMap("P_map_cowcave")
-        if state.inn_mode == 3 or state.inn_mode == 4:
-            tap(constants.L_map_scalesmall[0], constants.L_map_scalesmall[1], "縮小地圖")
-            click_image("P_chapter1")
-            inn_check()
-            general_inn_mode(mode=2)
-            wait_image("P_house")
-            inn_check()
-            map_click()
-            for i in range(2):
-                tap(constants.L_map_scalesmall[0], constants.L_map_scalesmall[1], "縮小地圖")
-                time.sleep(0.5)
-            tap(constants.L_map_scalebig[0], constants.L_map_scalebig[1], "放大地圖")
-            time.sleep(1)
-            swipe(450, 400, 450, 1200, 500)
-        wait_image("P_map_cowcave")
+        
         
         state.run_count += 1
     except StopIteration:

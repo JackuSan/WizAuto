@@ -2611,7 +2611,20 @@ def harken_check(target): #哈肯卡死檢測
                 return False
         else:
             break
+    else:
+        force_stop_game()
+        return False
     return True
+def bounty_reset():
+    #重置所有懸賞
+    click_image("P_bounty_reset_icon")
+    click_image("P_bounty_reset_selectall")
+    time.sleep(1)
+    click_image("P_bounty_reset_button")
+    waitVanish("P_bounty_reset_button")
+    wait_image("P_guild_bounty_back")
+    pass
+
 
 # 其他函數
 def press_key(key, duration=450):   #地城上下左右滑動
