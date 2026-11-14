@@ -1449,15 +1449,13 @@ def Farm_bounty_ScorpionGirl():
         click_image("P_guild")
         click_image("P_guild_request")
         wait_image("P_guild_request_special")
-        if find_image("P_guild_bounty"):
-            click_image("P_guild_bounty")
+        time.sleep(0.5)
+        if find_image("P_guild_bounty", similarity=0.8):
+            click_image("P_guild_bounty", similarity=0.8)
         else:
             swipe(530, 1408, 400, 1408, 500)
-            click_image("P_guild_bounty")
+            click_image("P_guild_bounty", similarity=0.8)
         time.sleep(1)
-        #check = wait_image(["P_guild_bounty_close", "P_guild_bounty_back"])
-        #if check == "P_guild_bounty_close":
-        #    click_image("P_guild_bounty_close")
         bounty_reset()
         click_image("P_guild_bounty_back")
         click_image("P_guild_leave")
@@ -1519,11 +1517,12 @@ def Farm_bounty_CowMan():
         click_image("P_guild")
         click_image("P_guild_request")
         wait_image("P_guild_request_special")
-        if find_image("P_guild_bounty"):
-            click_image("P_guild_bounty")
+        time.sleep(0.5)
+        if find_image("P_guild_bounty", similarity=0.8):
+            click_image("P_guild_bounty", similarity=0.8)
         else:
             swipe(530, 1408, 400, 1408, 500)
-            click_image("P_guild_bounty")
+            click_image("P_guild_bounty", similarity=0.8)
         time.sleep(1)
         bounty_reset()
         click_image("P_guild_bounty_back")
@@ -1591,11 +1590,12 @@ def Farm_bounty_faker():
         click_image("P_guild")
         click_image("P_guild_request")
         wait_image("P_guild_request_special")
-        if find_image("P_guild_bounty"):
-            click_image("P_guild_bounty")
+        time.sleep(0.5)
+        if find_image("P_guild_bounty", similarity=0.8):
+            click_image("P_guild_bounty", similarity=0.8)
         else:
             swipe(530, 1408, 400, 1408, 500)
-            click_image("P_guild_bounty")
+            click_image("P_guild_bounty", similarity=0.8)
         time.sleep(2)
         check = wait_image(["P_guild_bounty_close", "P_guild_bounty_back"])
         if check == "P_guild_bounty_close":

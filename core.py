@@ -250,10 +250,11 @@ def game_restart():
                    "P_fastbattle_inactive", "P_exit", "P_chest_open", "P_battle_wait", "P_inn"]  # 已進入遊戲
 
     if state.image_restart:
-        for image in state.image_restart:
-            if image not in stage2_list:
+        extra = state.image_restart if isinstance(state.image_restart, list) else [state.image_restart]
+        for image in extra:
+            if image and image not in stage2_list:
                 stage2_list.append(image)
-        logger.info(f"額外等待圖片: {state.image_restart}")
+        logger.info(f"額外等待圖片: {extra}")
 
     clicked_start1 = False
     clicked_start2 = False
@@ -874,7 +875,10 @@ def find_image(image_list, screenshot=None, similarity=0.7, region=None, log=Tru
     if screenshot is None:
         screenshot = take_screenshot()
     if state.image_restart:
-        state.image_restart = image_list
+        if isinstance(image_list, str):
+            state.image_restart = [image_list]
+        else:
+            state.image_restart = list(image_list) if image_list is not None else None
     # 檢查畫面卡死
     if state.freeze_check_status:
         if freeze_screen_check():
@@ -996,7 +1000,10 @@ def click_image(image_input, timeout=60.0, similarity=0.7, region=None, fail_cou
     # (state) global state.paused, state.image_fail_count, state.image_restart, state.image_stage, state.failed_image_sim
     state.image_stage = "click"
     image_list = [image_input] if isinstance(image_input, str) else image_input
-    state.image_restart = image_list
+    if isinstance(image_list, str):
+        state.image_restart = [image_list]
+    else:
+        state.image_restart = list(image_list) if image_list is not None else None
     state.failed_image_sim = 0.0
     start_time = time.time()
     logger.info(f"嘗試點擊 {image_list}, 超時{timeout}秒, 相似度要求{similarity}, 範圍 {region}")
@@ -1044,7 +1051,10 @@ def wait_image(image_input, timeout=60.0, similarity=0.7, region=None, fail_coun
     # (state) global state.paused, state.image_fail_count, state.image_restart, state.image_stage, state.failed_image_sim
     state.image_stage = "wait"
     image_list = [image_input] if isinstance(image_input, str) else image_input
-    state.image_restart = image_list
+    if isinstance(image_list, str):
+        state.image_restart = [image_list]
+    else:
+        state.image_restart = list(image_list) if image_list is not None else None
     state.failed_image_sim = 0.0
     start_time = time.time()
     logger.info(f"嘗試等待 {image_list}, 超時{timeout}秒, 相似度要求{similarity}, 範圍 {region}")
